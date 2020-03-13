@@ -48,13 +48,7 @@ import com.tngtech.archunit.core.domain.JavaModifier;
 import com.tngtech.archunit.core.domain.JavaType;
 import com.tngtech.archunit.core.importer.DomainBuilders.JavaAnnotationBuilder.ValueBuilder;
 import com.tngtech.archunit.core.importer.RawAccessRecord.CodeUnit;
-import org.objectweb.asm.AnnotationVisitor;
-import org.objectweb.asm.ClassVisitor;
-import org.objectweb.asm.FieldVisitor;
-import org.objectweb.asm.Label;
-import org.objectweb.asm.MethodVisitor;
-import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.Type;
+import org.objectweb.asm.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -303,12 +297,16 @@ class JavaClassProcessor extends ClassVisitor {
         private final DomainBuilders.JavaCodeUnitBuilder<?, ?> codeUnitBuilder;
         private final Set<DomainBuilders.JavaAnnotationBuilder> annotations = new HashSet<>();
         private int actualLineNumber;
+        private boolean logEverything;
 
         MethodProcessor(String declaringClassName, AccessHandler accessHandler, DomainBuilders.JavaCodeUnitBuilder<?, ?> codeUnitBuilder) {
             super(ASM_API_VERSION);
             this.declaringClassName = declaringClassName;
             this.accessHandler = accessHandler;
             this.codeUnitBuilder = codeUnitBuilder;
+            this.logEverything = declaringClassName.startsWith("cz.jiripinkas.jba.investigation.");
+            if (logEverything)
+                LOG.info("Method {}", codeUnitBuilder.getName());
         }
 
         @Override
@@ -319,19 +317,40 @@ class JavaClassProcessor extends ClassVisitor {
         // NOTE: ASM does not reliably visit this method, so if this method is skipped, line number 0 is recorded
         @Override
         public void visitLineNumber(int line, Label start) {
-            LOG.trace("Examining line number {}", line);
+            if (logEverything)
+                LOG.info("Examining line number {}", line);
+            else
+                LOG.trace("Examining line number {}", line);
             actualLineNumber = line;
             accessHandler.setLineNumber(actualLineNumber);
         }
 
         @Override
         public void visitFieldInsn(int opcode, String owner, String name, String desc) {
+            if (logEverything)
+                LOG.info("visitFieldInsn {}, {}, {}, {}", opcode, owner, name, desc);
+
             accessHandler.handleFieldInstruction(opcode, owner, name, desc);
         }
 
         @Override
         public void visitMethodInsn(int opcode, String owner, String name, String desc, boolean itf) {
+            if (logEverything)
+                LOG.info("visitMethodInsn {}, {}, {}, {}", opcode, owner, name, desc);
+
             accessHandler.handleMethodInstruction(owner, name, desc);
+        }
+
+        @Override
+        public void visitLocalVariable(String name, String descriptor, String signature, Label start, Label end, int index) {
+            if (logEverything)
+                LOG.info("visitLocalVariable {}, {}, {}, {}", name, descriptor, signature, index);
+        }
+
+        @Override
+        public void visitVarInsn(int opcode, int var) {
+            if (logEverything)
+                LOG.info("visitVarInsn {}, {}", opcode, var);
         }
 
         @Override
