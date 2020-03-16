@@ -332,62 +332,58 @@ class JavaClassProcessor extends ClassVisitor {
 
         @Override
         public void visitFieldInsn(int opcode, String owner, String name, String desc) {
-            super.visitFieldInsn(opcode, owner, name, desc);
-
-            if (logEverything)
+            if (logEverything) {
                 LOG.info("visitFieldInsn {}, {}, {}, {}", opcode, owner, name, desc);
+                LOG.info("stack: {}", stack);
+            }
 
             accessHandler.handleFieldInstruction(opcode, owner, name, desc);
+            super.visitFieldInsn(opcode, owner, name, desc);
         }
 
         @Override
         public void visitMethodInsn(int opcode, String owner, String name, String desc, boolean itf) {
-            super.visitMethodInsn(opcode, owner, name, desc, itf);
-
             if (logEverything) {
                 LOG.info("visitMethodInsn {}, {}, {}, {}", opcode, owner, name, desc);
                 LOG.info("stack: {}", stack);
             }
 
             accessHandler.handleMethodInstruction(owner, name, desc);
+            super.visitMethodInsn(opcode, owner, name, desc, itf);
         }
 
         @Override
         public void visitLocalVariable(String name, String descriptor, String signature, Label start, Label end, int index) {
-            super.visitLocalVariable(name, descriptor, signature, start, end, index);
-
             if (logEverything)
                 LOG.info("visitLocalVariable {}, {}, {}, {}", name, descriptor, signature, index);
+
+            super.visitLocalVariable(name, descriptor, signature, start, end, index);
         }
 
         @Override
         public void visitVarInsn(int opcode, int var) {
-            super.visitVarInsn(opcode, var);
-
             if (logEverything) {
                 LOG.info("visitVarInsn {}, {}", opcode, var);
             }
+
+            super.visitVarInsn(opcode, var);
         }
 
         @Override
         public AnnotationVisitor visitAnnotation(String desc, boolean visible) {
-            super.visitAnnotation(desc, visible);
-
             return new AnnotationProcessor(addAnnotationTo(annotations), annotationBuilderFor(desc));
         }
 
         @Override
         public AnnotationVisitor visitAnnotationDefault() {
-            super.visitAnnotationDefault();
-
             return new AnnotationDefaultProcessor(declaringClassName, codeUnitBuilder);
         }
 
         @Override
         public void visitEnd() {
-            super.visitEnd();
-
             codeUnitBuilder.withAnnotations(annotations);
+
+            super.visitEnd();
         }
 
         private static class AnnotationDefaultProcessor extends AnnotationVisitor {
