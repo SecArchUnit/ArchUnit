@@ -53,7 +53,7 @@ class ClassFileProcessor {
             try (InputStream s = location.openStream()) {
                 JavaClassProcessor javaClassProcessor =
                         new JavaClassProcessor(location.getUri(), classDetailsRecorder, accessHandler);
-                new ClassReader(s).accept(javaClassProcessor, 0);
+                new ClassReader(s).accept(javaClassProcessor, ClassReader.EXPAND_FRAMES);
                 importRecord.addAll(javaClassProcessor.createJavaClass().asSet());
             } catch (Exception e) {
                 LOG.warn(String.format("Couldn't import class from %s", location.getUri()), e);
@@ -183,7 +183,7 @@ class ClassFileProcessor {
         public Optional<JavaClass> tryImport(URI uri) {
             try (InputStream inputStream = uri.toURL().openStream()) {
                 JavaClassProcessor classProcessor = new JavaClassProcessor(uri, declarationHandler);
-                new ClassReader(inputStream).accept(classProcessor, 0);
+                new ClassReader(inputStream).accept(classProcessor, ClassReader.EXPAND_FRAMES);
                 return classProcessor.createJavaClass();
             } catch (Exception e) {
                 LOG.warn(String.format("Error during import from %s, falling back to simple import", uri), e);

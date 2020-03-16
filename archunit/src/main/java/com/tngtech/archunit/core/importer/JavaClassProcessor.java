@@ -49,6 +49,7 @@ import com.tngtech.archunit.core.domain.JavaType;
 import com.tngtech.archunit.core.importer.DomainBuilders.JavaAnnotationBuilder.ValueBuilder;
 import com.tngtech.archunit.core.importer.RawAccessRecord.CodeUnit;
 import org.objectweb.asm.*;
+import org.objectweb.asm.commons.AnalyzerAdapter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -227,7 +228,7 @@ class JavaClassProcessor extends ClassVisitor {
                 .withDescriptor(desc)
                 .withThrowsClause(typesFrom(exceptions));
 
-        return new MethodProcessor(className, accessHandler, codeUnitBuilder);
+        return new MethodProcessor(access, name, desc, className, accessHandler, codeUnitBuilder);
     }
 
     private List<JavaType> typesFrom(Type[] asmTypes) {
@@ -291,7 +292,7 @@ class JavaClassProcessor extends ClassVisitor {
         return result.build();
     }
 
-    private static class MethodProcessor extends MethodVisitor {
+    private static class MethodProcessor extends AnalyzerAdapter {
         private final String declaringClassName;
         private final AccessHandler accessHandler;
         private final DomainBuilders.JavaCodeUnitBuilder<?, ?> codeUnitBuilder;
@@ -299,8 +300,8 @@ class JavaClassProcessor extends ClassVisitor {
         private int actualLineNumber;
         private boolean logEverything;
 
-        MethodProcessor(String declaringClassName, AccessHandler accessHandler, DomainBuilders.JavaCodeUnitBuilder<?, ?> codeUnitBuilder) {
-            super(ASM_API_VERSION);
+        MethodProcessor(int access, String name, String desc, String declaringClassName, AccessHandler accessHandler, DomainBuilders.JavaCodeUnitBuilder<?, ?> codeUnitBuilder) {
+            super(ASM_API_VERSION, declaringClassName, access, name, desc, null);
             this.declaringClassName = declaringClassName;
             this.accessHandler = accessHandler;
             this.codeUnitBuilder = codeUnitBuilder;
@@ -335,8 +336,10 @@ class JavaClassProcessor extends ClassVisitor {
 
         @Override
         public void visitMethodInsn(int opcode, String owner, String name, String desc, boolean itf) {
-            if (logEverything)
+            if (logEverything) {
                 LOG.info("visitMethodInsn {}, {}, {}, {}", opcode, owner, name, desc);
+                LOG.info("stack: {}", stack);
+            }
 
             accessHandler.handleMethodInstruction(owner, name, desc);
         }
