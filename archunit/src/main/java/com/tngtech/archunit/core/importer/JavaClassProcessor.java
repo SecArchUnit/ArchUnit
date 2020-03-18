@@ -334,11 +334,14 @@ class JavaClassProcessor extends ClassVisitor {
         public void visitFieldInsn(int opcode, String owner, String name, String desc) {
             if (logEverything) {
                 LOG.info("visitFieldInsn {}, {}, {}, {}", opcode, owner, name, desc);
-                LOG.info("stack: {}", stack);
+                LOG.info("stack before: {}", stack);
             }
 
             accessHandler.handleFieldInstruction(opcode, owner, name, desc);
             super.visitFieldInsn(opcode, owner, name, desc);
+
+            if (logEverything)
+                LOG.info("stack after: {}", stack);
         }
 
         @Override
@@ -364,9 +367,28 @@ class JavaClassProcessor extends ClassVisitor {
         public void visitVarInsn(int opcode, int var) {
             if (logEverything) {
                 LOG.info("visitVarInsn {}, {}", opcode, var);
+                LOG.info("stack before: {}", stack);
             }
 
             super.visitVarInsn(opcode, var);
+
+            if (logEverything)
+                LOG.info("stack after: {}", stack);
+        }
+
+        @Override
+        public void visitInsn(int opcode) {
+            boolean isRelevant = opcode == Opcodes.AASTORE;
+
+            if (logEverything && isRelevant) {
+                LOG.info("visitInsn: {}", opcode);
+                LOG.info("stack before: {}", stack);
+            }
+
+            super.visitInsn(opcode);
+
+            if (logEverything && isRelevant)
+                LOG.info("stack after: {}", stack);
         }
 
         @Override
