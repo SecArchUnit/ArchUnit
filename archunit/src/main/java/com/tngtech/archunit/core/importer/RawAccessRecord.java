@@ -15,13 +15,7 @@
  */
 package com.tngtech.archunit.core.importer;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 
 import com.google.common.collect.Sets;
 import com.tngtech.archunit.base.DescribedPredicate;
@@ -47,17 +41,19 @@ import static java.util.regex.Pattern.quote;
 class RawAccessRecord {
     final CodeUnit caller;
     final TargetInfo target;
+    final Collection<JavaType> arguments;
     final int lineNumber;
 
-    RawAccessRecord(CodeUnit caller, TargetInfo target, int lineNumber) {
+    RawAccessRecord(CodeUnit caller, TargetInfo target, Collection<JavaType> arguments, int lineNumber) {
         this.caller = checkNotNull(caller);
         this.target = checkNotNull(target);
+        this.arguments = checkNotNull(arguments);
         this.lineNumber = lineNumber;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(caller, target, lineNumber);
+        return Objects.hash(caller, target, arguments, lineNumber);
     }
 
     @Override
@@ -71,6 +67,7 @@ class RawAccessRecord {
         final RawAccessRecord other = (RawAccessRecord) obj;
         return Objects.equals(this.caller, other.caller) &&
                 Objects.equals(this.target, other.target) &&
+                Objects.equals(this.arguments, other.arguments) &&
                 Objects.equals(this.lineNumber, other.lineNumber);
     }
 
@@ -407,6 +404,7 @@ class RawAccessRecord {
         CodeUnit caller;
         TargetInfo target;
         int lineNumber = -1;
+        Collection<JavaType> arguments;
 
         SELF withCaller(CodeUnit caller) {
             this.caller = caller;
@@ -415,6 +413,11 @@ class RawAccessRecord {
 
         SELF withTarget(TargetInfo target) {
             this.target = target;
+            return self();
+        }
+
+        SELF withArguments(Collection<JavaType> arguments) {
+            this.arguments = arguments;
             return self();
         }
 
@@ -429,15 +432,15 @@ class RawAccessRecord {
         }
 
         RawAccessRecord build() {
-            return new RawAccessRecord(caller, target, lineNumber);
+            return new RawAccessRecord(caller, target, arguments, lineNumber);
         }
     }
 
     static class ForField extends RawAccessRecord {
         final AccessType accessType;
 
-        private ForField(CodeUnit caller, TargetInfo target, int lineNumber, AccessType accessType) {
-            super(caller, target, lineNumber);
+        private ForField(CodeUnit caller, TargetInfo target, Collection<JavaType> arguments, int lineNumber, AccessType accessType) {
+            super(caller, target, arguments, lineNumber);
             this.accessType = accessType;
         }
 
@@ -471,7 +474,7 @@ class RawAccessRecord {
 
             @Override
             ForField build() {
-                return new ForField(super.caller, super.target, super.lineNumber, accessType);
+                return new ForField(super.caller, super.target, super.arguments, super.lineNumber, accessType);
             }
         }
     }

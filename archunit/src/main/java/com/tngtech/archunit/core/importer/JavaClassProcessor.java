@@ -323,51 +323,52 @@ class JavaClassProcessor extends ClassVisitor {
 
         @Override
         public void visitFieldInsn(int opcode, String owner, String name, String desc) {
-            if (logEverything) {
-                LOG.info("visitFieldInsn {}, {}, {}, {}", opcode, owner, name, desc);
-                LOG.info("stack before: {}", stack);
+            Set<JavaType> arguments = Collections.emptySet();
 
-                if (JavaFieldAccess.AccessType.forOpCode(opcode) == JavaFieldAccess.AccessType.SET) {
-                    String argument = null;
-
-                    Object topOfStack = stack.get(stack.size() - 1);
-                    if (topOfStack instanceof String) {
-                        argument = (String) topOfStack;
-                    }
-
-                    LOG.info("argument: {}", argument);
+            if (JavaFieldAccess.AccessType.forOpCode(opcode) == JavaFieldAccess.AccessType.SET) {
+                arguments = new HashSet<>();
+                Object topOfStack = stack.get(stack.size() - 1);
+                if (topOfStack instanceof String) {
+                    JavaType argument = JavaTypeImporter.createFromAsmObjectTypeName((String) topOfStack);
+                    arguments.add(argument);
                 }
             }
 
-            accessHandler.handleFieldInstruction(opcode, owner, name, desc);
+            if (logEverything) {
+                LOG.info("visitFieldInsn {}, {}, {}, {}", opcode, owner, name, desc);
+                LOG.info("stack before: {}", stack);
+                LOG.info("arguments: {}", arguments);
+            }
+
+            accessHandler.handleFieldInstruction(opcode, owner, name, desc, arguments);
             super.visitFieldInsn(opcode, owner, name, desc);
         }
 
         @Override
         public void visitMethodInsn(int opcode, String owner, String name, String desc, boolean itf) {
+            String parameterDesc = desc.substring(0, desc.indexOf(')'));
+            int parameterCount = CharMatcher.is(';').countIn(parameterDesc);
+
+            Set<JavaType> arguments = null;
+            if (parameterCount == 0) {
+                arguments = Collections.emptySet();
+            } else {
+                arguments = new HashSet<>();
+                for (int i = stack.size() - parameterCount; i < stack.size(); i++) {
+                    if (stack.get(i) instanceof String) {
+                        JavaType argument = JavaTypeImporter.createFromAsmObjectTypeName((String) stack.get(i));
+                        arguments.add(argument);
+                    }
+                }
+            }
+
             if (logEverything) {
                 LOG.info("visitMethodInsn {}, {}, {}, {}", opcode, owner, name, desc);
                 LOG.info("stack: {}", stack);
-
-                String parameterDesc = desc.substring(0, desc.indexOf(')'));
-                int parameterCount = CharMatcher.is(';').countIn(parameterDesc);
-
-                Set<String> arguments = null;
-                if (parameterCount == 0) {
-                    arguments = Collections.emptySet();
-                } else {
-                    arguments = new HashSet<>();
-                    for (int i = stack.size() - parameterCount; i < stack.size(); i++) {
-                        if (stack.get(i) instanceof String) {
-                            arguments.add((String) stack.get(i));
-                        }
-                    }
-                }
-
                 LOG.info("arguments: {}", arguments);
             }
 
-            accessHandler.handleMethodInstruction(owner, name, desc);
+            accessHandler.handleMethodInstruction(owner, name, desc, arguments);
             super.visitMethodInsn(opcode, owner, name, desc, itf);
         }
 
@@ -511,18 +512,18 @@ class JavaClassProcessor extends ClassVisitor {
     }
 
     interface AccessHandler {
-        void handleFieldInstruction(int opcode, String owner, String name, String desc);
+        void handleFieldInstruction(int opcode, String owner, String name, String desc, Collection<JavaType> arguments);
 
         void setContext(CodeUnit codeUnit);
 
         void setLineNumber(int lineNumber);
 
-        void handleMethodInstruction(String owner, String name, String desc);
+        void handleMethodInstruction(String owner, String name, String desc, Collection<JavaType> arguments);
 
         @Internal
         class NoOp implements AccessHandler {
             @Override
-            public void handleFieldInstruction(int opcode, String owner, String name, String desc) {
+            public void handleFieldInstruction(int opcode, String owner, String name, String desc, Collection<JavaType> arguments) {
             }
 
             @Override
@@ -534,7 +535,7 @@ class JavaClassProcessor extends ClassVisitor {
             }
 
             @Override
-            public void handleMethodInstruction(String owner, String name, String desc) {
+            public void handleMethodInstruction(String owner, String name, String desc, Collection<JavaType> arguments) {
             }
         }
     }
