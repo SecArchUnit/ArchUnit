@@ -17,13 +17,9 @@ package com.tngtech.archunit.core.importer;
 
 import java.lang.reflect.Array;
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
+import com.google.common.base.CharMatcher;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -349,6 +345,23 @@ class JavaClassProcessor extends ClassVisitor {
             if (logEverything) {
                 LOG.info("visitMethodInsn {}, {}, {}, {}", opcode, owner, name, desc);
                 LOG.info("stack: {}", stack);
+
+                String parameterDesc = desc.substring(0, desc.indexOf(')'));
+                int parameterCount = CharMatcher.is(';').countIn(parameterDesc);
+
+                Set<String> arguments = null;
+                if (parameterCount == 0) {
+                    arguments = Collections.emptySet();
+                } else {
+                    arguments = new HashSet<>();
+                    for (int i = stack.size() - parameterCount; i < stack.size(); i++) {
+                        if (stack.get(i) instanceof String) {
+                            arguments.add((String) stack.get(i));
+                        }
+                    }
+                }
+
+                LOG.info("arguments: {}", arguments);
             }
 
             accessHandler.handleMethodInstruction(owner, name, desc);
