@@ -325,7 +325,7 @@ class JavaClassProcessor extends ClassVisitor {
         public void visitFieldInsn(int opcode, String owner, String name, String desc) {
             Set<JavaType> arguments = Collections.emptySet();
 
-            if (JavaFieldAccess.AccessType.forOpCode(opcode) == JavaFieldAccess.AccessType.SET) {
+            if (stack != null && JavaFieldAccess.AccessType.forOpCode(opcode) == JavaFieldAccess.AccessType.SET) {
                 arguments = new HashSet<>();
                 Object topOfStack = stack.get(stack.size() - 1);
                 if (topOfStack instanceof String) {
@@ -349,10 +349,8 @@ class JavaClassProcessor extends ClassVisitor {
             String parameterDesc = desc.substring(0, desc.indexOf(')'));
             int parameterCount = CharMatcher.is(';').countIn(parameterDesc);
 
-            Set<JavaType> arguments = null;
-            if (parameterCount == 0) {
-                arguments = Collections.emptySet();
-            } else {
+            Set<JavaType> arguments = Collections.emptySet();
+            if (stack != null && parameterCount > 0) {
                 arguments = new HashSet<>();
                 for (int i = stack.size() - parameterCount; i < stack.size(); i++) {
                     if (stack.get(i) instanceof String) {
