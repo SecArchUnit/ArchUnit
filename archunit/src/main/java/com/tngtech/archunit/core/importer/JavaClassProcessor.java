@@ -36,12 +36,7 @@ import com.tngtech.archunit.base.Function;
 import com.tngtech.archunit.base.HasDescription;
 import com.tngtech.archunit.base.Optional;
 import com.tngtech.archunit.core.MayResolveTypesViaReflection;
-import com.tngtech.archunit.core.domain.JavaAnnotation;
-import com.tngtech.archunit.core.domain.JavaClass;
-import com.tngtech.archunit.core.domain.JavaEnumConstant;
-import com.tngtech.archunit.core.domain.JavaMethod;
-import com.tngtech.archunit.core.domain.JavaModifier;
-import com.tngtech.archunit.core.domain.JavaType;
+import com.tngtech.archunit.core.domain.*;
 import com.tngtech.archunit.core.importer.DomainBuilders.JavaAnnotationBuilder.ValueBuilder;
 import com.tngtech.archunit.core.importer.RawAccessRecord.CodeUnit;
 import org.objectweb.asm.*;
@@ -331,13 +326,21 @@ class JavaClassProcessor extends ClassVisitor {
             if (logEverything) {
                 LOG.info("visitFieldInsn {}, {}, {}, {}", opcode, owner, name, desc);
                 LOG.info("stack before: {}", stack);
+
+                if (JavaFieldAccess.AccessType.forOpCode(opcode) == JavaFieldAccess.AccessType.SET) {
+                    String argument = null;
+
+                    Object topOfStack = stack.get(stack.size() - 1);
+                    if (topOfStack instanceof String) {
+                        argument = (String) topOfStack;
+                    }
+
+                    LOG.info("argument: {}", argument);
+                }
             }
 
             accessHandler.handleFieldInstruction(opcode, owner, name, desc);
             super.visitFieldInsn(opcode, owner, name, desc);
-
-            if (logEverything)
-                LOG.info("stack after: {}", stack);
         }
 
         @Override
