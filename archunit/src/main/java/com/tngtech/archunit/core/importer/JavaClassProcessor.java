@@ -385,36 +385,74 @@ class JavaClassProcessor extends ClassVisitor {
             super.visitFieldInsn(opcode, owner, name, desc);
         }
 
+        private int getParameterCount(String descriptor) {
+            descriptor = descriptor.substring(0, descriptor.indexOf(')'));
+            int parameterCount = CharMatcher.is(';').countIn(descriptor);
+            return parameterCount;
+        }
+
+        private Collection<JavaType> getMethodArguments(String descriptor) {
+            int parameterCount = getParameterCount(descriptor);
+
+            if (stack == null || parameterCount == 0) {
+                return Collections.emptySet();
+            }
+
+            Set<JavaType> arguments = new HashSet<>();
+
+            // Add argument types based on references stored on the stack
+            for (int i = stack.size() - parameterCount; i < stack.size(); i++) {
+                if (stack.get(i) instanceof String) {
+                    JavaType argument = JavaTypeImporter.createFromAsmObjectTypeName((String) stack.get(i));
+                    arguments.add(argument);
+                }
+            }
+
+            // Add type hints (e.g. known array contents)
+            // TODO might want to separate hints into their own collection
+            arguments.addAll(popHints(parameterCount));
+
+            return arguments;
+        }
+
         @Override
         public void visitMethodInsn(int opcode, String owner, String name, String desc, boolean itf) {
-            String parameterDesc = desc.substring(0, desc.indexOf(')'));
-            int parameterCount = CharMatcher.is(';').countIn(parameterDesc);
-
-            Set<JavaType> arguments = Collections.emptySet();
-            if (stack != null && parameterCount > 0) {
-                arguments = new HashSet<>();
-
-                // Add argument types based on references stored on the stack
-                for (int i = stack.size() - parameterCount; i < stack.size(); i++) {
-                    if (stack.get(i) instanceof String) {
-                        JavaType argument = JavaTypeImporter.createFromAsmObjectTypeName((String) stack.get(i));
-                        arguments.add(argument);
-                    }
-                }
-
-                // Add type hints (e.g. known array contents)
-                // TODO might want to separate hints into their own collection
-                arguments.addAll(popHints(parameterCount));
-            }
+            Collection<JavaType> arguments = getMethodArguments(desc);
 
             if (logEverything) {
                 LOG.info("visitMethodInsn {}, {}, {}, {}", opcode, owner, name, desc);
-                LOG.info("stack: {}", stack);
                 LOG.info("arguments: {}", arguments);
             }
 
             accessHandler.handleMethodInstruction(owner, name, desc, arguments);
             super.visitMethodInsn(opcode, owner, name, desc, itf);
+        }
+
+        @Override
+        public void visitInvokeDynamicInsn(String name, String descriptor, Handle bootstrapMethodHandle, Object... bootstrapMethodArguments) {
+            if (logEverything) {
+                LOG.info("visitInvokeDynamicInsn {}, {}, {}, {}", name, descriptor, bootstrapMethodHandle, Arrays.toString(bootstrapMethodArguments));
+                LOG.info("stack before: {}", stack);
+            }
+
+            // Java 9+ string concatenation
+            if ("makeConcatWithConstants".equals(name)) {
+                int parameterCount = getParameterCount(descriptor);
+                int stackIndexOfResultingString = stack.size() - parameterCount;
+
+                Collection<JavaType> arguments = getMethodArguments(descriptor);
+                arguments.addAll(popHints(parameterCount));
+
+                for (JavaType argument : arguments) {
+                    putHint(stackIndexOfResultingString, argument);
+                }
+            }
+
+            super.visitInvokeDynamicInsn(name, descriptor, bootstrapMethodHandle, bootstrapMethodArguments);
+
+            if (logEverything) {
+                LOG.info("stack after: {}", stack);
+            }
         }
 
         @Override
@@ -469,6 +507,10 @@ class JavaClassProcessor extends ClassVisitor {
         }
 
         private void visitDupInsn() {
+            if (stack == null) {
+                return;
+            }
+
             int originIndex = stack.size() - 2;
             int destinationIndex = stack.size() - 1;
 
