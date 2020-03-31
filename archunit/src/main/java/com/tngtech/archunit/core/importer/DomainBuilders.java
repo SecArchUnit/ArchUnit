@@ -16,12 +16,7 @@
 package com.tngtech.archunit.core.importer;
 
 import java.net.URI;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
@@ -518,6 +513,7 @@ public final class DomainBuilders {
     public abstract static class JavaAccessBuilder<TARGET extends AccessTarget, SELF extends JavaAccessBuilder<TARGET, SELF>> {
         private JavaCodeUnit origin;
         private TARGET target;
+        private Collection<JavaClass> arguments;
         private int lineNumber;
 
         private JavaAccessBuilder() {
@@ -533,6 +529,11 @@ public final class DomainBuilders {
             return self();
         }
 
+        SELF withArguments(final Collection<JavaClass> arguments) {
+            this.arguments = arguments;
+            return self();
+        }
+
         SELF withLineNumber(final int lineNumber) {
             this.lineNumber = lineNumber;
             return self();
@@ -544,6 +545,10 @@ public final class DomainBuilders {
 
         public TARGET getTarget() {
             return target;
+        }
+
+        public Collection<JavaClass> getArguments() {
+            return arguments;
         }
 
         public int getLineNumber() {
