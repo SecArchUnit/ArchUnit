@@ -290,6 +290,7 @@ class JavaClassProcessor extends ClassVisitor {
         private final Set<DomainBuilders.JavaAnnotationBuilder> annotations = new HashSet<>();
         private int actualLineNumber;
         private boolean logEverything;
+        private final Map<Integer, Collection<JavaType>> stackTypeHints;
 
         MethodProcessor(int access, String name, String desc, String declaringClassName, AccessHandler accessHandler, DomainBuilders.JavaCodeUnitBuilder<?, ?> codeUnitBuilder) {
             super(ASM_API_VERSION, declaringClassName, access, name, desc, null);
@@ -297,8 +298,48 @@ class JavaClassProcessor extends ClassVisitor {
             this.accessHandler = accessHandler;
             this.codeUnitBuilder = codeUnitBuilder;
             this.logEverything = declaringClassName.startsWith("cz.jiripinkas.jba.investigation.");
+            this.stackTypeHints = new HashMap<>();
             if (logEverything)
                 LOG.info("Method {}", codeUnitBuilder.getName());
+        }
+
+        private void putHint(int stackIndex, JavaType typeHint) {
+            if (logEverything) {
+                LOG.info("putHint {} {}", stackIndex, typeHint);
+            }
+
+            Collection<JavaType> hints = stackTypeHints.get(stackIndex);
+            if (hints == null) {
+                hints = new HashSet<>();
+                stackTypeHints.put(stackIndex, hints);
+            }
+
+            hints.add(typeHint);
+        }
+
+        private Collection<JavaType> popHints() {
+            Collection<JavaType> hints = stackTypeHints.remove(stack.size() - 1);
+            if (hints == null) {
+                hints = Collections.emptySet();
+            }
+            return hints;
+        }
+
+        private Collection<JavaType> popHints(int argumentCount) {
+            Collection<JavaType> hints = new HashSet<>();
+            for (int i = 1; i <= argumentCount; i++) {
+                hints.addAll(popHints());
+            }
+            return hints;
+        }
+
+        private void linkHints(int stackOrigin, int stackTarget) {
+            Collection<JavaType> hints = stackTypeHints.get(stackOrigin);
+            if (hints == null) {
+                hints = new HashSet<>();
+                stackTypeHints.put(stackOrigin, hints);
+            }
+            stackTypeHints.put(stackTarget, hints);
         }
 
         @Override
@@ -352,12 +393,18 @@ class JavaClassProcessor extends ClassVisitor {
             Set<JavaType> arguments = Collections.emptySet();
             if (stack != null && parameterCount > 0) {
                 arguments = new HashSet<>();
+
+                // Add argument types based on references stored on the stack
                 for (int i = stack.size() - parameterCount; i < stack.size(); i++) {
                     if (stack.get(i) instanceof String) {
                         JavaType argument = JavaTypeImporter.createFromAsmObjectTypeName((String) stack.get(i));
                         arguments.add(argument);
                     }
                 }
+
+                // Add type hints (e.g. known array contents)
+                // TODO might want to separate hints into their own collection
+                arguments.addAll(popHints(parameterCount));
             }
 
             if (logEverything) {
@@ -393,17 +440,45 @@ class JavaClassProcessor extends ClassVisitor {
 
         @Override
         public void visitInsn(int opcode) {
-            boolean isRelevant = opcode == Opcodes.AASTORE;
+            if (opcode == Opcodes.AASTORE) {
+                visitArrayStoreInsn();
+            }
 
-            if (logEverything && isRelevant) {
-                LOG.info("visitInsn: {}", opcode);
+            // ^^^ Before stack changes
+            super.visitInsn(opcode);
+            // vvv After stack changes
+
+            if (opcode == Opcodes.DUP) {
+                visitDupInsn();
+            }
+        }
+
+        private void visitArrayStoreInsn() {
+            if (logEverything) {
+                LOG.info("visitArrayStoreInsn");
                 LOG.info("stack before: {}", stack);
             }
 
-            super.visitInsn(opcode);
+            int stackIndexOfTargetArray = stack.size() - 3;
+            Object rawTypeHint = stack.get(stack.size() - 1);
 
-            if (logEverything && isRelevant)
-                LOG.info("stack after: {}", stack);
+            if (rawTypeHint instanceof String) {
+                JavaType hint = JavaTypeImporter.createFromAsmObjectTypeName((String) rawTypeHint);
+                putHint(stackIndexOfTargetArray, hint);
+            }
+        }
+
+        private void visitDupInsn() {
+            int originIndex = stack.size() - 2;
+            int destinationIndex = stack.size() - 1;
+
+            boolean isReference = stack.get(originIndex) instanceof String;
+            if (!isReference) {
+                return;
+            }
+
+            // When a reference is duplicated, also duplicate the type hints
+            linkHints(originIndex, destinationIndex);
         }
 
         @Override
