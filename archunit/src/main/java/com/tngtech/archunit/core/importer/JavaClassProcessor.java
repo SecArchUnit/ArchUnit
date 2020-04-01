@@ -386,29 +386,25 @@ class JavaClassProcessor extends ClassVisitor {
         }
 
         @Override
-        public void visitLocalVariable(String name, String descriptor, String signature, Label start, Label end, int index) {
-            if (logEverything)
-                LOG.info("visitLocalVariable {}, {}, {}, {}", name, descriptor, signature, index);
-
-            super.visitLocalVariable(name, descriptor, signature, start, end, index);
-        }
-
-        @Override
         public void visitVarInsn(int opcode, int var) {
             if (logEverything) {
                 LOG.info("visitVarInsn {}, {}", opcode, var);
                 LOG.info("stack before: {}", stack);
             }
 
-            if (opcode == Opcodes.ALOAD) {
-                // Push local variable onto stack
-
-            } else if (opcode == Opcodes.ASTORE) {
+            if (opcode == Opcodes.ASTORE && stack != null) {
                 // Pop top of stack into local variable
-
+                flow.storeLocalVar(var);
             }
 
+            // ^^^ Before stack changes
             super.visitVarInsn(opcode, var);
+            // vvv After stack changes
+
+            if (opcode == Opcodes.ALOAD && stack != null) {
+                // Push local variable onto stack
+                flow.loadLocalVar(var);
+            }
 
             if (logEverything)
                 LOG.info("stack after: {}", stack);
@@ -517,6 +513,7 @@ class JavaClassProcessor extends ClassVisitor {
 
         private class InformationFlow {
             private final Map<Integer, Collection<JavaType>> stackTypeHints = new HashMap<>();
+            private final Map<Integer, Collection<JavaType>> localVarTypeHints = new HashMap<>();
 
             private void putStackHint(int stackIndex, JavaType typeHint) {
                 if (logEverything) {
@@ -555,6 +552,26 @@ class JavaClassProcessor extends ClassVisitor {
                     stackTypeHints.put(stackOrigin, hints);
                 }
                 stackTypeHints.put(stackTarget, hints);
+            }
+
+            private void storeLocalVar(int varIndex) {
+                int stackIndex = stack.size() - 1;
+                Collection<JavaType> hints = stackTypeHints.remove(stackIndex);
+                if (hints != null) {
+                    localVarTypeHints.put(varIndex, hints);
+                } else {
+                    localVarTypeHints.remove(varIndex);
+                }
+            }
+
+            private void loadLocalVar(int varIndex) {
+                int stackIndex = stack.size() - 1;
+                Collection<JavaType> hints = localVarTypeHints.get(varIndex);
+                if (hints != null) {
+                    stackTypeHints.put(stackIndex, hints);
+                } else {
+                    stackTypeHints.remove(stackIndex);
+                }
             }
 
             private Collection<JavaType> getArgumentsWithHints(int argumentCount) {
