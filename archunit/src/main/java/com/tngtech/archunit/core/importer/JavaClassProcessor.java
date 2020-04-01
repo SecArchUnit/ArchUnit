@@ -357,6 +357,7 @@ class JavaClassProcessor extends ClassVisitor {
 
             if (logEverything) {
                 LOG.info("visitMethodInsn {}, {}, {}, {}", opcode, owner, name, desc);
+                LOG.info("stack before: {}", stack);
                 LOG.info("arguments: {}", arguments);
             }
 
@@ -372,9 +373,20 @@ class JavaClassProcessor extends ClassVisitor {
                     }
                 }
 
+                // Transfer type hints into StringBuilder
+                if ("java/lang/StringBuilder".equals(owner) && parameterCount > 0) {
+                    int stackIndexOfBuilder = stack.size() - parameterCount - 1;
+                    for (JavaType hint : arguments) {
+                        flow.putStackHint(stackIndexOfBuilder, hint);
+                    }
+                }
             }
 
             super.visitMethodInsn(opcode, owner, name, desc, itf);
+
+            if (logEverything) {
+                LOG.info("stack after: {}", stack);
+            }
         }
 
         @Override
