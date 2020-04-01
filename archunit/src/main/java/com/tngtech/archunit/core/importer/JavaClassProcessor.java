@@ -354,6 +354,7 @@ class JavaClassProcessor extends ClassVisitor {
         public void visitMethodInsn(int opcode, String owner, String name, String desc, boolean itf) {
             int parameterCount = getParameterCount(desc);
             Collection<JavaType> arguments = flow.getArgumentsWithHints(parameterCount);
+            boolean methodHasReturnValue = !desc.endsWith(")V") || CONSTRUCTOR_NAME.equals(name);
 
             if (logEverything) {
                 LOG.info("visitMethodInsn {}, {}, {}, {}", opcode, owner, name, desc);
@@ -363,26 +364,29 @@ class JavaClassProcessor extends ClassVisitor {
 
             accessHandler.handleMethodInstruction(owner, name, desc, arguments);
 
-            if (stack != null) {
-                // Transfer type hint for toString() calls
-                if ("toString".equals(name)) {
-                    int stackIndex = stack.size() - 1;
-                    if (stack.get(stackIndex) instanceof String) {
-                        JavaType typeHint = JavaTypeImporter.createFromAsmObjectTypeName((String) stack.get(stackIndex));
-                        flow.putStackHint(stackIndex, typeHint);
+            // Copy type hints to method result
+            if (stack != null && methodHasReturnValue) {
+                int stackIndexOfMethodResult = stack.size() - parameterCount;
+
+                if (opcode != Opcodes.INVOKESTATIC) {
+                    stackIndexOfMethodResult -= 1;
+
+                    // Add method owner as type hint
+                    Object rawOwnerHint = stack.get(stackIndexOfMethodResult);
+                    if (rawOwnerHint instanceof String) {
+                        JavaType ownerHint = JavaTypeImporter.createFromAsmObjectTypeName((String) rawOwnerHint);
+                        flow.putStackHint(stackIndexOfMethodResult, ownerHint);
                     }
                 }
 
-                // Transfer type hints into StringBuilder
-                if ("java/lang/StringBuilder".equals(owner) && parameterCount > 0) {
-                    int stackIndexOfBuilder = stack.size() - parameterCount - 1;
-                    for (JavaType hint : arguments) {
-                        flow.putStackHint(stackIndexOfBuilder, hint);
-                    }
+                for (JavaType hint : arguments) {
+                    flow.putStackHint(stackIndexOfMethodResult, hint);
                 }
             }
 
+            // ^^^ Before stack changes
             super.visitMethodInsn(opcode, owner, name, desc, itf);
+            // vvv After stack changes
 
             if (logEverything) {
                 LOG.info("stack after: {}", stack);
