@@ -361,6 +361,19 @@ class JavaClassProcessor extends ClassVisitor {
             }
 
             accessHandler.handleMethodInstruction(owner, name, desc, arguments);
+
+            if (stack != null) {
+                // Transfer type hint for toString() calls
+                if ("toString".equals(name)) {
+                    int stackIndex = stack.size() - 1;
+                    if (stack.get(stackIndex) instanceof String) {
+                        JavaType typeHint = JavaTypeImporter.createFromAsmObjectTypeName((String) stack.get(stackIndex));
+                        flow.putStackHint(stackIndex, typeHint);
+                    }
+                }
+
+            }
+
             super.visitMethodInsn(opcode, owner, name, desc, itf);
         }
 
@@ -372,7 +385,7 @@ class JavaClassProcessor extends ClassVisitor {
             }
 
             // Java 9+ string concatenation
-            if ("makeConcatWithConstants".equals(name)) {
+            if ("makeConcatWithConstants".equals(name) && stack != null) {
                 int parameterCount = getParameterCount(descriptor);
                 int stackIndexOfResultingString = stack.size() - parameterCount;
                 Collection<JavaType> arguments = flow.getArgumentsWithHints(parameterCount);
