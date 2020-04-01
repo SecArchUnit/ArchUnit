@@ -459,11 +459,6 @@ class JavaClassProcessor extends ClassVisitor {
             int originIndex = stack.size() - 2;
             int destinationIndex = stack.size() - 1;
 
-            boolean isReference = stack.get(originIndex) instanceof String;
-            if (!isReference) {
-                return;
-            }
-
             // When a reference is duplicated, also duplicate the type hints
             flow.linkStackHints(originIndex, destinationIndex);
         }
@@ -557,6 +552,10 @@ class JavaClassProcessor extends ClassVisitor {
             }
 
             private void linkStackHints(int stackOrigin, int stackTarget) {
+                if (logEverything) {
+                    LOG.info("Linking stack index {} to {}", stackTarget, stackOrigin);
+                }
+
                 Collection<JavaType> hints = stackTypeHints.get(stackOrigin);
                 if (hints == null) {
                     hints = new HashSet<>();
