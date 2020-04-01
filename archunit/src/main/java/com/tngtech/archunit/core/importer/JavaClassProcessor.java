@@ -432,10 +432,8 @@ class JavaClassProcessor extends ClassVisitor {
             }
 
             int stackIndexOfTargetArray = stack.size() - 3;
-            Object rawTypeHint = stack.get(stack.size() - 1);
-
-            if (rawTypeHint instanceof String) {
-                JavaType hint = JavaTypeImporter.createFromAsmObjectTypeName((String) rawTypeHint);
+            Collection<JavaType> hints = flow.getArgumentsWithHints(1);
+            for (JavaType hint : hints) {
                 flow.putStackHint(stackIndexOfTargetArray, hint);
             }
         }
@@ -529,8 +527,8 @@ class JavaClassProcessor extends ClassVisitor {
                 hints.add(typeHint);
             }
 
-            private Collection<JavaType> popStackHints() {
-                Collection<JavaType> hints = stackTypeHints.remove(stack.size() - 1);
+            private Collection<JavaType> popStackHintsAt(int stackIndex) {
+                Collection<JavaType> hints = stackTypeHints.remove(stackIndex);
                 if (hints == null) {
                     hints = Collections.emptySet();
                 }
@@ -540,7 +538,7 @@ class JavaClassProcessor extends ClassVisitor {
             private Collection<JavaType> popStackHints(int argumentCount) {
                 Collection<JavaType> hints = new HashSet<>();
                 for (int i = 1; i <= argumentCount; i++) {
-                    hints.addAll(popStackHints());
+                    hints.addAll(popStackHintsAt(stack.size() - i));
                 }
                 return hints;
             }
