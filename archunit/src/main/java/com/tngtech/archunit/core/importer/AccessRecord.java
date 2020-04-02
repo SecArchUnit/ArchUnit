@@ -100,7 +100,16 @@ interface AccessRecord<TARGET extends AccessTarget> {
                 callerSupplier = createCallerSupplier(record.caller, classes);
                 argumentHints = new HashSet<>();
                 for (RawHint rawHint : record.arguments) {
-                    argumentHints.add(new Hint(classes.getOrResolve(rawHint.getType().getName())));
+                    JavaMember memberOrigin = null;
+                    if (rawHint.getMemberOwner() != null) {
+                        for (JavaMember member : classes.getOrResolve(rawHint.getMemberOwner().getName()).getAllMembers()) {
+                            if (rawHint.getMemberName().equals(member.getName())) {
+                                memberOrigin = member;
+                                break;
+                            }
+                        }
+                    }
+                    argumentHints.add(new Hint(classes.getOrResolve(rawHint.getType().getName()), memberOrigin));
                 }
             }
 
@@ -153,16 +162,25 @@ interface AccessRecord<TARGET extends AccessTarget> {
             final ImportedClasses classes;
             private final JavaClass targetOwner;
             private final Supplier<JavaCodeUnit> callerSupplier;
-            private final Collection<Hint> arguments;
+            private final Collection<Hint> argumentHints;
 
             RawMethodCallRecordProcessed(RawAccessRecord record, ImportedClasses classes) {
                 this.record = record;
                 this.classes = classes;
                 targetOwner = this.classes.getOrResolve(record.target.owner.getName());
                 callerSupplier = createCallerSupplier(record.caller, classes);
-                arguments = new HashSet<>();
-                for (RawHint argument : record.arguments) {
-                    arguments.add(new Hint(this.classes.getOrResolve(argument.getType().getName())));
+                argumentHints = new HashSet<>();
+                for (RawHint rawHint : record.arguments) {
+                    JavaMember memberOrigin = null;
+                    if (rawHint.getMemberOwner() != null) {
+                        for (JavaMember member : classes.getOrResolve(rawHint.getMemberOwner().getName()).getAllMembers()) {
+                            if (rawHint.getMemberName().equals(member.getName())) {
+                                memberOrigin = member;
+                                break;
+                            }
+                        }
+                    }
+                    argumentHints.add(new Hint(classes.getOrResolve(rawHint.getType().getName()), memberOrigin));
                 }
             }
 
@@ -187,7 +205,7 @@ interface AccessRecord<TARGET extends AccessTarget> {
 
             @Override
             public Collection<Hint> getArgumentHints() {
-                return arguments;
+                return argumentHints;
             }
 
             @Override
@@ -224,8 +242,17 @@ interface AccessRecord<TARGET extends AccessTarget> {
                 targetOwner = this.classes.getOrResolve(record.target.owner.getName());
                 callerSupplier = createCallerSupplier(record.caller, classes);
                 argumentHints = new HashSet<>();
-                for (RawHint argument : record.arguments) {
-                    argumentHints.add(new Hint(this.classes.getOrResolve(argument.getType().getName())));
+                for (RawHint rawHint : record.arguments) {
+                    JavaMember memberOrigin = null;
+                    if (rawHint.getMemberOwner() != null) {
+                        for (JavaMember member : classes.getOrResolve(rawHint.getMemberOwner().getName()).getAllMembers()) {
+                            if (rawHint.getMemberName().equals(member.getName())) {
+                                memberOrigin = member;
+                                break;
+                            }
+                        }
+                    }
+                    argumentHints.add(new Hint(classes.getOrResolve(rawHint.getType().getName()), memberOrigin));
                 }
             }
 

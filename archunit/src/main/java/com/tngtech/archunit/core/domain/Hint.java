@@ -15,14 +15,36 @@
  */
 package com.tngtech.archunit.core.domain;
 
+import java.util.Objects;
+
 public class Hint {
     private final JavaClass javaClass;
+    private final JavaMember javaMemberOrigin;
 
-    public Hint(JavaClass javaClass) {
+    public Hint(JavaClass javaClass, JavaMember memberOrigin) {
         this.javaClass = javaClass;
+        this.javaMemberOrigin = memberOrigin;
     }
 
     public JavaClass getJavaClass() {
         return javaClass;
+    }
+
+    public JavaMember getMemberOrigin() {
+        return javaMemberOrigin;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Hint hint = (Hint) o;
+        return javaClass.equals(hint.javaClass) &&
+                Objects.equals(javaMemberOrigin, hint.javaMemberOrigin);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(javaClass, javaMemberOrigin);
     }
 }

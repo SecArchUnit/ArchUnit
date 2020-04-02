@@ -48,6 +48,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.nullToEmpty;
 import static com.tngtech.archunit.core.domain.JavaConstructor.CONSTRUCTOR_NAME;
+import static com.tngtech.archunit.core.domain.JavaFieldAccess.AccessType.GET;
 import static com.tngtech.archunit.core.domain.JavaFieldAccess.AccessType.SET;
 import static com.tngtech.archunit.core.domain.JavaStaticInitializer.STATIC_INITIALIZER_NAME;
 import static com.tngtech.archunit.core.importer.ClassFileProcessor.ASM_API_VERSION;
@@ -286,6 +287,7 @@ class JavaClassProcessor extends ClassVisitor {
 
     private static class MethodProcessor extends AnalyzerAdapter {
         private final String declaringClassName;
+        private final String name;
         private final AccessHandler accessHandler;
         private final DomainBuilders.JavaCodeUnitBuilder<?, ?> codeUnitBuilder;
         private final Set<DomainBuilders.JavaAnnotationBuilder> annotations = new HashSet<>();
@@ -296,12 +298,13 @@ class JavaClassProcessor extends ClassVisitor {
         MethodProcessor(int access, String name, String desc, String declaringClassName, AccessHandler accessHandler, DomainBuilders.JavaCodeUnitBuilder<?, ?> codeUnitBuilder) {
             super(ASM_API_VERSION, declaringClassName, access, name, desc, null);
             this.declaringClassName = declaringClassName;
+            this.name = name;
             this.accessHandler = accessHandler;
             this.codeUnitBuilder = codeUnitBuilder;
             this.logEverything = declaringClassName.startsWith("cz.jiripinkas.jba.investigation.");
             this.flow = new InformationFlow();
             if (logEverything)
-                LOG.info("Method {}", codeUnitBuilder.getName());
+                LOG.info("Method {}.{}", declaringClassName, name);
         }
 
         public int getParameterCount(String methodDescriptor) {
@@ -346,9 +349,20 @@ class JavaClassProcessor extends ClassVisitor {
 
             accessHandler.handleFieldInstruction(opcode, owner, name, desc, argumentHints);
             super.visitFieldInsn(opcode, owner, name, desc);
+
+            if (JavaFieldAccess.AccessType.forOpCode(opcode) == GET && stack != null) {
+                if (logEverything) {
+                    LOG.info("getFieldInsn {} {}", desc, owner);
+                }
+
+                RawHint hint = new RawHint(
+                        JavaTypeImporter.importAsmType(Type.getType(desc)),
+                        JavaTypeImporter.createFromAsmObjectTypeName(owner),
+                        name);
+
+                flow.putStackHint(stack.size() - 1, hint);
+            }
         }
-
-
 
         @Override
         public void visitMethodInsn(int opcode, String owner, String name, String desc, boolean itf) {
@@ -375,7 +389,7 @@ class JavaClassProcessor extends ClassVisitor {
                     Object rawOwnerHint = stack.get(stackIndexOfMethodResult);
                     if (rawOwnerHint instanceof String) {
                         JavaType ownerHint = JavaTypeImporter.createFromAsmObjectTypeName((String) rawOwnerHint);
-                        flow.putStackHint(stackIndexOfMethodResult, new RawHint(ownerHint));
+                        flow.putStackHint(stackIndexOfMethodResult, new RawHint(ownerHint, ownerHint, name));
                     }
                 }
 
@@ -464,10 +478,10 @@ class JavaClassProcessor extends ClassVisitor {
                 return;
             }
 
-            // Return reference on top of stack to caller
             if (logEverything) {
                 LOG.info("visitReturnReferenceInsn, stack: {}", stack);
             }
+
             flow.putReturnValueHints(flow.popStackHints(1));
         }
 

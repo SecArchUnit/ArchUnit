@@ -17,14 +17,47 @@ package com.tngtech.archunit.core.importer;
 
 import com.tngtech.archunit.core.domain.JavaType;
 
+import java.util.Objects;
+
 public class RawHint {
-    private final JavaType type;
+    private JavaType type;
+    private JavaType memberOwner;
+    private String memberName;
 
     public RawHint(JavaType type) {
         this.type = type;
     }
 
+    public RawHint(JavaType type, JavaType owner, String name) {
+        this(type);
+        this.memberOwner = owner;
+        this.memberName = name;
+    }
+
     public JavaType getType() {
         return type;
+    }
+
+    public JavaType getMemberOwner() {
+        return memberOwner;
+    }
+
+    public String getMemberName() {
+        return memberName;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        RawHint rawHint = (RawHint) o;
+        return type.equals(rawHint.type) &&
+                Objects.equals(memberOwner, rawHint.memberOwner) &&
+                Objects.equals(memberName, rawHint.memberName);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(type, memberOwner, memberName);
     }
 }
