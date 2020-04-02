@@ -342,7 +342,7 @@ class JavaClassProcessor extends ClassVisitor {
             }
 
             if (logEverything) {
-                LOG.info("visitFieldInsn {}, {}, {}, {}", opcode, owner, name, desc);
+                LOG.info("visitFieldInsn {}, {}, {}, {}, {}", JavaFieldAccess.AccessType.forOpCode(opcode), owner, name, desc);
                 LOG.info("stack before: {}", stack);
                 LOG.info("arguments: {}", argumentHints);
             }
@@ -526,6 +526,9 @@ class JavaClassProcessor extends ClassVisitor {
             if (codeUnitBuilder instanceof DomainBuilders.JavaMethodBuilder) {
                 // Add return value hints
                 ((DomainBuilders.JavaMethodBuilder) codeUnitBuilder).withReturnValueHints(flow.getReturnValueHints());
+                if (logEverything) {
+                    LOG.info("visitEnd, arguments {}", flow.getReturnValueHints());
+                }
             }
 
             super.visitEnd();

@@ -60,4 +60,13 @@ public class RawHint {
     public int hashCode() {
         return Objects.hash(type, memberOwner, memberName);
     }
+
+    @Override
+    public String toString() {
+        return "RawHint{" +
+                "type=" + type +
+                ", memberOwner=" + memberOwner +
+                ", memberName='" + memberName + '\'' +
+                '}';
+    }
 }
