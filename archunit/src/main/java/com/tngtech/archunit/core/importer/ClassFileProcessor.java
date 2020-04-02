@@ -24,7 +24,6 @@ import com.tngtech.archunit.base.Optional;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.domain.JavaFieldAccess.AccessType;
-import com.tngtech.archunit.core.domain.JavaType;
 import com.tngtech.archunit.core.importer.JavaClassProcessor.AccessHandler;
 import com.tngtech.archunit.core.importer.JavaClassProcessor.DeclarationHandler;
 import com.tngtech.archunit.core.importer.RawAccessRecord.CodeUnit;
@@ -139,7 +138,7 @@ class ClassFileProcessor {
         }
 
         @Override
-        public void handleFieldInstruction(int opcode, String owner, String name, String desc, Collection<JavaType> arguments) {
+        public void handleFieldInstruction(int opcode, String owner, String name, String desc, Collection<RawHint> arguments) {
             AccessType accessType = AccessType.forOpCode(opcode);
             LOG.trace("Found {} access to field {}.{}:{} in line {}", accessType, owner, name, desc, lineNumber);
             TargetInfo target = new RawAccessRecord.FieldTargetInfo(owner, name, desc);
@@ -149,7 +148,7 @@ class ClassFileProcessor {
         }
 
         @Override
-        public void handleMethodInstruction(String owner, String name, String desc, Collection<JavaType> arguments) {
+        public void handleMethodInstruction(String owner, String name, String desc, Collection<RawHint> arguments) {
             LOG.trace("Found call of method {}.{}:{} in line {}", owner, name, desc, lineNumber);
             if (CONSTRUCTOR_NAME.equals(name)) {
                 TargetInfo target = new ConstructorTargetInfo(owner, name, desc);
@@ -160,11 +159,11 @@ class ClassFileProcessor {
             }
         }
 
-        private <BUILDER extends RawAccessRecord.BaseBuilder<BUILDER>> BUILDER filled(BUILDER builder, TargetInfo target, Collection<JavaType> arguments) {
+        private <BUILDER extends RawAccessRecord.BaseBuilder<BUILDER>> BUILDER filled(BUILDER builder, TargetInfo target, Collection<RawHint> arguments) {
             return builder
                     .withCaller(codeUnit)
                     .withTarget(target)
-                    .withArguments(arguments)
+                    .withArgumentHints(arguments)
                     .withLineNumber(lineNumber);
         }
     }

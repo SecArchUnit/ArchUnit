@@ -238,7 +238,7 @@ class ClassGraphCreator implements ImportContext {
         return builder
                 .withOrigin(record.getCaller())
                 .withTarget(record.getTarget())
-                .withArguments(record.getArguments())
+                .withArgumentHints(record.getArgumentHints())
                 .withLineNumber(record.getLineNumber());
     }
 

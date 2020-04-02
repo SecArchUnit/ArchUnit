@@ -26,30 +26,11 @@ import com.google.common.collect.ImmutableSet;
 import com.tngtech.archunit.Internal;
 import com.tngtech.archunit.base.HasDescription;
 import com.tngtech.archunit.base.Optional;
-import com.tngtech.archunit.core.domain.AccessTarget;
+import com.tngtech.archunit.core.domain.*;
 import com.tngtech.archunit.core.domain.AccessTarget.ConstructorCallTarget;
 import com.tngtech.archunit.core.domain.AccessTarget.FieldAccessTarget;
 import com.tngtech.archunit.core.domain.AccessTarget.MethodCallTarget;
-import com.tngtech.archunit.core.domain.DomainObjectCreationContext;
-import com.tngtech.archunit.core.domain.Formatters;
-import com.tngtech.archunit.core.domain.JavaAnnotation;
-import com.tngtech.archunit.core.domain.JavaClass;
-import com.tngtech.archunit.core.domain.JavaClassList;
-import com.tngtech.archunit.core.domain.JavaCodeUnit;
-import com.tngtech.archunit.core.domain.JavaConstructor;
-import com.tngtech.archunit.core.domain.JavaConstructorCall;
-import com.tngtech.archunit.core.domain.JavaEnumConstant;
-import com.tngtech.archunit.core.domain.JavaField;
-import com.tngtech.archunit.core.domain.JavaFieldAccess;
 import com.tngtech.archunit.core.domain.JavaFieldAccess.AccessType;
-import com.tngtech.archunit.core.domain.JavaMember;
-import com.tngtech.archunit.core.domain.JavaMethod;
-import com.tngtech.archunit.core.domain.JavaMethodCall;
-import com.tngtech.archunit.core.domain.JavaModifier;
-import com.tngtech.archunit.core.domain.JavaStaticInitializer;
-import com.tngtech.archunit.core.domain.JavaType;
-import com.tngtech.archunit.core.domain.Source;
-import com.tngtech.archunit.core.domain.ThrowsClause;
 import com.tngtech.archunit.core.importer.DomainBuilders.JavaAnnotationBuilder.ValueBuilder;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -513,7 +494,7 @@ public final class DomainBuilders {
     public abstract static class JavaAccessBuilder<TARGET extends AccessTarget, SELF extends JavaAccessBuilder<TARGET, SELF>> {
         private JavaCodeUnit origin;
         private TARGET target;
-        private Collection<JavaClass> arguments;
+        private Collection<Hint> argumentHints;
         private int lineNumber;
 
         private JavaAccessBuilder() {
@@ -529,8 +510,8 @@ public final class DomainBuilders {
             return self();
         }
 
-        SELF withArguments(final Collection<JavaClass> arguments) {
-            this.arguments = arguments;
+        SELF withArgumentHints(final Collection<Hint> argumentHints) {
+            this.argumentHints = argumentHints;
             return self();
         }
 
@@ -547,8 +528,8 @@ public final class DomainBuilders {
             return target;
         }
 
-        public Collection<JavaClass> getArguments() {
-            return arguments;
+        public Collection<Hint> getArgumentHints() {
+            return argumentHints;
         }
 
         public int getLineNumber() {

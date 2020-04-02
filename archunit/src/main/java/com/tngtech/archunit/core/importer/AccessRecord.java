@@ -45,7 +45,7 @@ interface AccessRecord<TARGET extends AccessTarget> {
 
     TARGET getTarget();
 
-    Collection<JavaClass> getArguments();
+    Collection<Hint> getArgumentHints();
 
     int getLineNumber();
 
@@ -91,16 +91,16 @@ interface AccessRecord<TARGET extends AccessTarget> {
             private final ImportedClasses classes;
             private final JavaClass targetOwner;
             private final Supplier<JavaCodeUnit> callerSupplier;
-            private final Collection<JavaClass> arguments;
+            private final Collection<Hint> argumentHints;
 
             RawConstructorCallRecordProcessed(RawAccessRecord record, ImportedClasses classes) {
                 this.record = record;
                 this.classes = classes;
                 targetOwner = this.classes.getOrResolve(record.target.owner.getName());
                 callerSupplier = createCallerSupplier(record.caller, classes);
-                arguments = new HashSet<>();
-                for (JavaType argument : record.arguments) {
-                    arguments.add(this.classes.getOrResolve(argument.getName()));
+                argumentHints = new HashSet<>();
+                for (RawHint rawHint : record.arguments) {
+                    argumentHints.add(new Hint(classes.getOrResolve(rawHint.getType().getName())));
                 }
             }
 
@@ -123,8 +123,8 @@ interface AccessRecord<TARGET extends AccessTarget> {
             }
 
             @Override
-            public Collection<JavaClass> getArguments() {
-                return arguments;
+            public Collection<Hint> getArgumentHints() {
+                return argumentHints;
             }
 
             @Override
@@ -153,7 +153,7 @@ interface AccessRecord<TARGET extends AccessTarget> {
             final ImportedClasses classes;
             private final JavaClass targetOwner;
             private final Supplier<JavaCodeUnit> callerSupplier;
-            private final Collection<JavaClass> arguments;
+            private final Collection<Hint> arguments;
 
             RawMethodCallRecordProcessed(RawAccessRecord record, ImportedClasses classes) {
                 this.record = record;
@@ -161,8 +161,8 @@ interface AccessRecord<TARGET extends AccessTarget> {
                 targetOwner = this.classes.getOrResolve(record.target.owner.getName());
                 callerSupplier = createCallerSupplier(record.caller, classes);
                 arguments = new HashSet<>();
-                for (JavaType argument : record.arguments) {
-                    arguments.add(this.classes.getOrResolve(argument.getName()));
+                for (RawHint argument : record.arguments) {
+                    arguments.add(new Hint(this.classes.getOrResolve(argument.getType().getName())));
                 }
             }
 
@@ -186,7 +186,7 @@ interface AccessRecord<TARGET extends AccessTarget> {
             }
 
             @Override
-            public Collection<JavaClass> getArguments() {
+            public Collection<Hint> getArgumentHints() {
                 return arguments;
             }
 
@@ -216,16 +216,16 @@ interface AccessRecord<TARGET extends AccessTarget> {
             final ImportedClasses classes;
             private final JavaClass targetOwner;
             private final Supplier<JavaCodeUnit> callerSupplier;
-            private final Collection<JavaClass> arguments;
+            private final Collection<Hint> argumentHints;
 
             RawFieldAccessRecordProcessed(RawAccessRecord.ForField record, ImportedClasses classes) {
                 this.record = record;
                 this.classes = classes;
                 targetOwner = this.classes.getOrResolve(record.target.owner.getName());
                 callerSupplier = createCallerSupplier(record.caller, classes);
-                arguments = new HashSet<>();
-                for (JavaType argument : record.arguments) {
-                    arguments.add(this.classes.getOrResolve(argument.getName()));
+                argumentHints = new HashSet<>();
+                for (RawHint argument : record.arguments) {
+                    argumentHints.add(new Hint(this.classes.getOrResolve(argument.getType().getName())));
                 }
             }
 
@@ -252,8 +252,8 @@ interface AccessRecord<TARGET extends AccessTarget> {
             }
 
             @Override
-            public Collection<JavaClass> getArguments() {
-                return arguments;
+            public Collection<Hint> getArgumentHints() {
+                return argumentHints;
             }
 
             @Override

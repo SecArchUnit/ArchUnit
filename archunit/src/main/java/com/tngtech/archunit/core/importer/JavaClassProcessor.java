@@ -332,19 +332,19 @@ class JavaClassProcessor extends ClassVisitor {
 
         @Override
         public void visitFieldInsn(int opcode, String owner, String name, String desc) {
-            Collection<JavaType> arguments = Collections.emptySet();
+            Collection<RawHint> argumentHints = Collections.emptySet();
 
             if (JavaFieldAccess.AccessType.forOpCode(opcode) == SET) {
-                arguments = flow.getArgumentsWithHints(1);
+                argumentHints = flow.getArgumentHints(1);
             }
 
             if (logEverything) {
                 LOG.info("visitFieldInsn {}, {}, {}, {}", opcode, owner, name, desc);
                 LOG.info("stack before: {}", stack);
-                LOG.info("arguments: {}", arguments);
+                LOG.info("arguments: {}", argumentHints);
             }
 
-            accessHandler.handleFieldInstruction(opcode, owner, name, desc, arguments);
+            accessHandler.handleFieldInstruction(opcode, owner, name, desc, argumentHints);
             super.visitFieldInsn(opcode, owner, name, desc);
         }
 
@@ -353,7 +353,7 @@ class JavaClassProcessor extends ClassVisitor {
         @Override
         public void visitMethodInsn(int opcode, String owner, String name, String desc, boolean itf) {
             int parameterCount = getParameterCount(desc);
-            Collection<JavaType> arguments = flow.getArgumentsWithHints(parameterCount);
+            Collection<RawHint> arguments = flow.getArgumentHints(parameterCount);
             boolean methodHasReturnValue = !desc.endsWith(")V") || CONSTRUCTOR_NAME.equals(name);
 
             if (logEverything) {
@@ -375,11 +375,11 @@ class JavaClassProcessor extends ClassVisitor {
                     Object rawOwnerHint = stack.get(stackIndexOfMethodResult);
                     if (rawOwnerHint instanceof String) {
                         JavaType ownerHint = JavaTypeImporter.createFromAsmObjectTypeName((String) rawOwnerHint);
-                        flow.putStackHint(stackIndexOfMethodResult, ownerHint);
+                        flow.putStackHint(stackIndexOfMethodResult, new RawHint(ownerHint));
                     }
                 }
 
-                for (JavaType hint : arguments) {
+                for (RawHint hint : arguments) {
                     flow.putStackHint(stackIndexOfMethodResult, hint);
                 }
             }
@@ -404,13 +404,14 @@ class JavaClassProcessor extends ClassVisitor {
             if ("makeConcatWithConstants".equals(name) && stack != null) {
                 int parameterCount = getParameterCount(descriptor);
                 int stackIndexOfResultingString = stack.size() - parameterCount;
-                Collection<JavaType> arguments = flow.getArgumentsWithHints(parameterCount);
+                Collection<RawHint> arguments = flow.getArgumentHints(parameterCount);
 
-                for (JavaType argument : arguments) {
+                for (RawHint argument : arguments) {
                     flow.putStackHint(stackIndexOfResultingString, argument);
                 }
             }
 
+            // ^^^ Before stack changes
             super.visitInvokeDynamicInsn(name, descriptor, bootstrapMethodHandle, bootstrapMethodArguments);
         }
 
@@ -445,6 +446,10 @@ class JavaClassProcessor extends ClassVisitor {
                 visitArrayStoreInsn();
             }
 
+            if (opcode == Opcodes.ARETURN) {
+                visitReturnReferenceInsn();
+            }
+
             // ^^^ Before stack changes
             super.visitInsn(opcode);
             // vvv After stack changes
@@ -454,6 +459,18 @@ class JavaClassProcessor extends ClassVisitor {
             }
         }
 
+        private void visitReturnReferenceInsn() {
+            if (stack == null) {
+                return;
+            }
+
+            // Return reference on top of stack to caller
+            if (logEverything) {
+                LOG.info("visitReturnReferenceInsn, stack: {}", stack);
+            }
+            flow.putReturnValueHints(flow.popStackHints(1));
+        }
+
         private void visitArrayStoreInsn() {
             if (logEverything) {
                 LOG.info("visitArrayStoreInsn");
@@ -461,8 +478,8 @@ class JavaClassProcessor extends ClassVisitor {
             }
 
             int stackIndexOfTargetArray = stack.size() - 3;
-            Collection<JavaType> hints = flow.getArgumentsWithHints(1);
-            for (JavaType hint : hints) {
+            Collection<RawHint> hints = flow.getArgumentHints(1);
+            for (RawHint hint : hints) {
                 flow.putStackHint(stackIndexOfTargetArray, hint);
             }
         }
@@ -534,15 +551,24 @@ class JavaClassProcessor extends ClassVisitor {
         }
 
         private class InformationFlow {
-            private final Map<Integer, Collection<JavaType>> stackTypeHints = new HashMap<>();
-            private final Map<Integer, Collection<JavaType>> localVarTypeHints = new HashMap<>();
+            private final Map<Integer, Collection<RawHint>> stackTypeHints = new HashMap<>();
+            private final Map<Integer, Collection<RawHint>> localVarTypeHints = new HashMap<>();
+            private final Collection<RawHint> returnValueTypeHints = new HashSet<>();
 
-            private void putStackHint(int stackIndex, JavaType typeHint) {
+            private void putReturnValueHints(Collection<RawHint> typeHints) {
+                returnValueTypeHints.addAll(typeHints);
+            }
+
+            private Collection<RawHint> getReturnValueHints() {
+                return returnValueTypeHints;
+            }
+
+            private void putStackHint(int stackIndex, RawHint typeHint) {
                 if (logEverything) {
                     LOG.info("putHint {} {}", stackIndex, typeHint);
                 }
 
-                Collection<JavaType> hints = stackTypeHints.get(stackIndex);
+                Collection<RawHint> hints = stackTypeHints.get(stackIndex);
                 if (hints == null) {
                     hints = new HashSet<>();
                     stackTypeHints.put(stackIndex, hints);
@@ -551,16 +577,16 @@ class JavaClassProcessor extends ClassVisitor {
                 hints.add(typeHint);
             }
 
-            private Collection<JavaType> popStackHintsAt(int stackIndex) {
-                Collection<JavaType> hints = stackTypeHints.remove(stackIndex);
+            private Collection<RawHint> popStackHintsAt(int stackIndex) {
+                Collection<RawHint> hints = stackTypeHints.remove(stackIndex);
                 if (hints == null) {
                     hints = Collections.emptySet();
                 }
                 return hints;
             }
 
-            private Collection<JavaType> popStackHints(int argumentCount) {
-                Collection<JavaType> hints = new HashSet<>();
+            private Collection<RawHint> popStackHints(int argumentCount) {
+                Collection<RawHint> hints = new HashSet<>();
                 for (int i = 1; i <= argumentCount; i++) {
                     hints.addAll(popStackHintsAt(stack.size() - i));
                 }
@@ -572,7 +598,7 @@ class JavaClassProcessor extends ClassVisitor {
                     LOG.info("Linking stack index {} to {}", stackTarget, stackOrigin);
                 }
 
-                Collection<JavaType> hints = stackTypeHints.get(stackOrigin);
+                Collection<RawHint> hints = stackTypeHints.get(stackOrigin);
                 if (hints == null) {
                     hints = new HashSet<>();
                     stackTypeHints.put(stackOrigin, hints);
@@ -582,7 +608,7 @@ class JavaClassProcessor extends ClassVisitor {
 
             private void storeLocalVar(int varIndex) {
                 int stackIndex = stack.size() - 1;
-                Collection<JavaType> hints = stackTypeHints.remove(stackIndex);
+                Collection<RawHint> hints = stackTypeHints.remove(stackIndex);
                 if (hints != null) {
                     localVarTypeHints.put(varIndex, hints);
                 } else {
@@ -592,7 +618,7 @@ class JavaClassProcessor extends ClassVisitor {
 
             private void loadLocalVar(int varIndex) {
                 int stackIndex = stack.size() - 1;
-                Collection<JavaType> hints = localVarTypeHints.get(varIndex);
+                Collection<RawHint> hints = localVarTypeHints.get(varIndex);
                 if (hints != null) {
                     stackTypeHints.put(stackIndex, hints);
                 } else {
@@ -600,18 +626,18 @@ class JavaClassProcessor extends ClassVisitor {
                 }
             }
 
-            private Collection<JavaType> getArgumentsWithHints(int argumentCount) {
+            private Collection<RawHint> getArgumentHints(int argumentCount) {
                 if (stack == null || argumentCount == 0) {
                     return Collections.emptySet();
                 }
 
-                Set<JavaType> arguments = new HashSet<>();
+                Set<RawHint> arguments = new HashSet<>();
 
                 // Add argument types based on references stored on the stack
                 for (int i = stack.size() - argumentCount; i < stack.size(); i++) {
                     if (stack.get(i) instanceof String) {
                         JavaType argument = JavaTypeImporter.createFromAsmObjectTypeName((String) stack.get(i));
-                        arguments.add(argument);
+                        arguments.add(new RawHint(argument));
                     }
                 }
 
@@ -672,18 +698,18 @@ class JavaClassProcessor extends ClassVisitor {
     }
 
     interface AccessHandler {
-        void handleFieldInstruction(int opcode, String owner, String name, String desc, Collection<JavaType> arguments);
+        void handleFieldInstruction(int opcode, String owner, String name, String desc, Collection<RawHint> arguments);
 
         void setContext(CodeUnit codeUnit);
 
         void setLineNumber(int lineNumber);
 
-        void handleMethodInstruction(String owner, String name, String desc, Collection<JavaType> arguments);
+        void handleMethodInstruction(String owner, String name, String desc, Collection<RawHint> arguments);
 
         @Internal
         class NoOp implements AccessHandler {
             @Override
-            public void handleFieldInstruction(int opcode, String owner, String name, String desc, Collection<JavaType> arguments) {
+            public void handleFieldInstruction(int opcode, String owner, String name, String desc, Collection<RawHint> arguments) {
             }
 
             @Override
@@ -695,7 +721,7 @@ class JavaClassProcessor extends ClassVisitor {
             }
 
             @Override
-            public void handleMethodInstruction(String owner, String name, String desc, Collection<JavaType> arguments) {
+            public void handleMethodInstruction(String owner, String name, String desc, Collection<RawHint> arguments) {
             }
         }
     }

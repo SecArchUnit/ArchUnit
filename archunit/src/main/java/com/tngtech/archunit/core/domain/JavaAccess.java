@@ -36,7 +36,7 @@ public abstract class JavaAccess<TARGET extends AccessTarget>
 
     private final JavaCodeUnit origin;
     private final TARGET target;
-    private final Collection<JavaClass> arguments;
+    private final Collection<Hint> argumentHints;
     private final int lineNumber;
     private final int hashCode;
     private final SourceCodeLocation sourceCodeLocation;
@@ -44,7 +44,7 @@ public abstract class JavaAccess<TARGET extends AccessTarget>
     JavaAccess(DomainBuilders.JavaAccessBuilder<TARGET, ?> builder) {
         this.origin = checkNotNull(builder.getOrigin());
         this.target = checkNotNull(builder.getTarget());
-        this.arguments = checkNotNull(builder.getArguments());
+        this.argumentHints = checkNotNull(builder.getArgumentHints());
         this.lineNumber = builder.getLineNumber();
         this.hashCode = Objects.hash(origin.getFullName(), target.getFullName(), lineNumber);
         this.sourceCodeLocation = SourceCodeLocation.of(getOriginOwner(), lineNumber);
@@ -77,8 +77,8 @@ public abstract class JavaAccess<TARGET extends AccessTarget>
     }
 
     @PublicAPI(usage = ACCESS)
-    public Collection<JavaClass> getArguments() {
-        return arguments;
+    public Collection<Hint> getArgumentHints() {
+        return argumentHints;
     }
 
     @PublicAPI(usage = ACCESS)
