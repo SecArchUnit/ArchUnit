@@ -523,6 +523,10 @@ class JavaClassProcessor extends ClassVisitor {
         @Override
         public void visitEnd() {
             codeUnitBuilder.withAnnotations(annotations);
+            if (codeUnitBuilder instanceof DomainBuilders.JavaMethodBuilder) {
+                // Add return value hints
+                ((DomainBuilders.JavaMethodBuilder) codeUnitBuilder).withReturnValueHints(flow.getReturnValueHints());
+            }
 
             super.visitEnd();
         }

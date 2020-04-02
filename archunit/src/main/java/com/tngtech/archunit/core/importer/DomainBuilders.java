@@ -34,6 +34,7 @@ import com.tngtech.archunit.core.domain.JavaFieldAccess.AccessType;
 import com.tngtech.archunit.core.importer.DomainBuilders.JavaAnnotationBuilder.ValueBuilder;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Suppliers.memoize;
 import static com.tngtech.archunit.core.domain.DomainObjectCreationContext.createJavaClassList;
 import static com.tngtech.archunit.core.domain.DomainObjectCreationContext.createSource;
 import static com.tngtech.archunit.core.domain.DomainObjectCreationContext.createThrowsClause;
@@ -233,6 +234,8 @@ public final class DomainBuilders {
     public static final class JavaMethodBuilder extends JavaCodeUnitBuilder<JavaMethod, JavaMethodBuilder> {
         private Optional<ValueBuilder> annotationDefaultValueBuilder = Optional.absent();
         private Supplier<Optional<Object>> annotationDefaultValue = Suppliers.ofInstance(Optional.absent());
+        private Collection<RawHint> rawReturnValueHints;
+        private Supplier<Collection<Hint>> returnValueHints;
 
         JavaMethodBuilder() {
         }
@@ -242,15 +245,49 @@ public final class DomainBuilders {
             return this;
         }
 
+        JavaMethodBuilder withReturnValueHints(Collection<RawHint> returnValueHints) {
+            this.rawReturnValueHints = returnValueHints;
+            return this;
+        }
+
         public Supplier<Optional<Object>> getAnnotationDefaultValue() {
             return annotationDefaultValue;
         }
 
+        public Supplier<Collection<Hint>> getReturnValueHints() {
+            return returnValueHints;
+        }
+
         @Override
-        JavaMethod construct(JavaMethodBuilder builder, final ClassesByTypeName importedClasses) {
+        JavaMethod construct(final JavaMethodBuilder builder, final ClassesByTypeName importedClasses) {
             if (annotationDefaultValueBuilder.isPresent()) {
                 annotationDefaultValue = Suppliers.memoize(new DefaultValueSupplier(getOwner(), annotationDefaultValueBuilder.get(), importedClasses));
             }
+
+            returnValueHints = memoize(new Supplier<Collection<Hint>>() {
+                @Override
+                public Collection<Hint> get() {
+                    if (rawReturnValueHints == null) {
+                        return Collections.emptySet();
+                    }
+
+                    Collection<Hint> hints = new HashSet<>();
+                    for (RawHint rawHint : rawReturnValueHints) {
+                        JavaMember memberOrigin = null;
+                        if (rawHint.getMemberOwner() != null) {
+                            for (JavaMember member : importedClasses.get(rawHint.getMemberOwner().getName()).getAllMembers()) {
+                                if (rawHint.getMemberName().equals(member.getName())) {
+                                    memberOrigin = member;
+                                    break;
+                                }
+                            }
+                        }
+                        hints.add(new Hint(importedClasses.get(rawHint.getType().getName()), memberOrigin));
+                    }
+                    return hints;
+                }
+            });
+
             return DomainObjectCreationContext.createJavaMethod(builder);
         }
 
