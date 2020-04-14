@@ -274,13 +274,8 @@ public final class DomainBuilders {
                     Collection<Hint> hints = new HashSet<>();
                     for (RawHint rawHint : rawReturnValueHints) {
                         JavaMember memberOrigin = null;
-                        if (rawHint.getMemberOwner() != null) {
-                            for (JavaMember member : importedClasses.get(rawHint.getMemberOwner().getName()).getAllMembers()) {
-                                if (rawHint.getMemberName().equals(member.getName())) {
-                                    memberOrigin = member;
-                                    break;
-                                }
-                            }
+                        if (rawHint.hasMember()) {
+                            memberOrigin = rawHint.resolveMemberIn(importedClasses.get(rawHint.getMemberOwner().getName()));
                         }
                         hints.add(new Hint(importedClasses.get(rawHint.getType().getName()), memberOrigin));
                     }

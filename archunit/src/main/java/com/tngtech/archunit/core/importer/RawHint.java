@@ -15,6 +15,8 @@
  */
 package com.tngtech.archunit.core.importer;
 
+import com.tngtech.archunit.core.domain.JavaClass;
+import com.tngtech.archunit.core.domain.JavaMember;
 import com.tngtech.archunit.core.domain.JavaType;
 
 import java.util.Objects;
@@ -23,15 +25,17 @@ public class RawHint {
     private JavaType type;
     private JavaType memberOwner;
     private String memberName;
+    private String memberDescriptor;
 
     public RawHint(JavaType type) {
         this.type = type;
     }
 
-    public RawHint(JavaType type, JavaType owner, String name) {
+    public RawHint(JavaType type, JavaType owner, String name, String descriptor) {
         this(type);
         this.memberOwner = owner;
         this.memberName = name;
+        this.memberDescriptor = descriptor;
     }
 
     public JavaType getType() {
@@ -46,6 +50,24 @@ public class RawHint {
         return memberName;
     }
 
+    public String getMemberDescriptor() {
+        return memberDescriptor;
+    }
+
+    public boolean hasMember() {
+        return memberOwner != null;
+    }
+
+    public JavaMember resolveMemberIn(JavaClass targetClass) {
+        for (JavaMember member : targetClass.getAllMembers()) {
+            if (memberName.equals(member.getName()) && memberDescriptor.equals(member.getDescriptor())) {
+                return member;
+            }
+        }
+
+        throw new RuntimeException("Unable to resolve origin member of raw hint " + this);
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -53,12 +75,13 @@ public class RawHint {
         RawHint rawHint = (RawHint) o;
         return type.equals(rawHint.type) &&
                 Objects.equals(memberOwner, rawHint.memberOwner) &&
-                Objects.equals(memberName, rawHint.memberName);
+                Objects.equals(memberName, rawHint.memberName) &&
+                Objects.equals(memberDescriptor, rawHint.memberDescriptor);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(type, memberOwner, memberName);
+        return Objects.hash(type, memberOwner, memberName, memberDescriptor);
     }
 
     @Override
@@ -67,6 +90,7 @@ public class RawHint {
                 "type=" + type +
                 ", memberOwner=" + memberOwner +
                 ", memberName='" + memberName + '\'' +
+                ", memberDescriptor='" + memberDescriptor + '\'' +
                 '}';
     }
 }

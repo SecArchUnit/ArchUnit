@@ -358,7 +358,7 @@ class JavaClassProcessor extends ClassVisitor {
                 RawHint hint = new RawHint(
                         JavaTypeImporter.importAsmType(Type.getType(desc)),
                         JavaTypeImporter.createFromAsmObjectTypeName(owner),
-                        name);
+                        name, desc);
 
                 flow.putStackHint(stack.size() - 1, hint);
             }
@@ -389,7 +389,7 @@ class JavaClassProcessor extends ClassVisitor {
                     Object rawOwnerHint = stack.get(stackIndexOfMethodResult);
                     if (rawOwnerHint instanceof String) {
                         JavaType ownerHint = JavaTypeImporter.createFromAsmObjectTypeName((String) rawOwnerHint);
-                        flow.putStackHint(stackIndexOfMethodResult, new RawHint(ownerHint, ownerHint, name));
+                        flow.putStackHint(stackIndexOfMethodResult, new RawHint(ownerHint, ownerHint, name, desc));
                     }
                 }
 

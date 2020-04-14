@@ -101,13 +101,8 @@ interface AccessRecord<TARGET extends AccessTarget> {
                 argumentHints = new HashSet<>();
                 for (RawHint rawHint : record.arguments) {
                     JavaMember memberOrigin = null;
-                    if (rawHint.getMemberOwner() != null) {
-                        for (JavaMember member : classes.getOrResolve(rawHint.getMemberOwner().getName()).getAllMembers()) {
-                            if (rawHint.getMemberName().equals(member.getName())) {
-                                memberOrigin = member;
-                                break;
-                            }
-                        }
+                    if (rawHint.hasMember()) {
+                        memberOrigin = rawHint.resolveMemberIn(classes.getOrResolve(rawHint.getMemberOwner().getName()));
                     }
                     argumentHints.add(new Hint(classes.getOrResolve(rawHint.getType().getName()), memberOrigin));
                 }
@@ -172,13 +167,8 @@ interface AccessRecord<TARGET extends AccessTarget> {
                 argumentHints = new HashSet<>();
                 for (RawHint rawHint : record.arguments) {
                     JavaMember memberOrigin = null;
-                    if (rawHint.getMemberOwner() != null) {
-                        for (JavaMember member : classes.getOrResolve(rawHint.getMemberOwner().getName()).getAllMembers()) {
-                            if (rawHint.getMemberName().equals(member.getName())) {
-                                memberOrigin = member;
-                                break;
-                            }
-                        }
+                    if (rawHint.hasMember()) {
+                        memberOrigin = rawHint.resolveMemberIn(classes.getOrResolve(rawHint.getMemberOwner().getName()));
                     }
                     argumentHints.add(new Hint(classes.getOrResolve(rawHint.getType().getName()), memberOrigin));
                 }
@@ -244,13 +234,8 @@ interface AccessRecord<TARGET extends AccessTarget> {
                 argumentHints = new HashSet<>();
                 for (RawHint rawHint : record.arguments) {
                     JavaMember memberOrigin = null;
-                    if (rawHint.getMemberOwner() != null) {
-                        for (JavaMember member : classes.getOrResolve(rawHint.getMemberOwner().getName()).getAllMembers()) {
-                            if (rawHint.getMemberName().equals(member.getName())) {
-                                memberOrigin = member;
-                                break;
-                            }
-                        }
+                    if (rawHint.hasMember()) {
+                        memberOrigin = rawHint.resolveMemberIn(classes.getOrResolve(rawHint.getMemberOwner().getName()));
                     }
                     argumentHints.add(new Hint(classes.getOrResolve(rawHint.getType().getName()), memberOrigin));
                 }
