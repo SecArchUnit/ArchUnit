@@ -59,10 +59,15 @@ public class RawHint {
     }
 
     public JavaMember resolveMemberIn(JavaClass targetClass) {
-        for (JavaMember member : targetClass.getAllMembers()) {
-            if (memberName.equals(member.getName()) && memberDescriptor.equals(member.getDescriptor())) {
-                return member;
+        try {
+            for (JavaMember member : targetClass.getAllMembers()) {
+                if (memberName.equals(member.getName()) && memberDescriptor.equals(member.getDescriptor())) {
+                    return member;
+                }
             }
+        } catch (NullPointerException e) {
+            System.err.println("Tried to get members before they have been processed, raw hint: " + this);
+            return null;
         }
 
         throw new RuntimeException("Unable to resolve origin member of raw hint " + this);
