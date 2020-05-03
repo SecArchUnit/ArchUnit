@@ -378,23 +378,40 @@ class JavaClassProcessor extends ClassVisitor {
 
             accessHandler.handleMethodInstruction(owner, name, desc, arguments);
 
-            // Copy type hints to method result
-            if (stack != null && methodHasReturnValue) {
-                int stackIndexOfMethodResult = stack.size() - parameterCount;
+            // Handle flow of hints
+            if (stack != null) {
+                // Argument hints flow into...
 
+                // ... the instance this method was invoked on...
                 if (opcode != Opcodes.INVOKESTATIC) {
-                    stackIndexOfMethodResult -= 1;
+                    int stackIndexOfInstance = stack.size() - parameterCount;
 
-                    // Add method owner as type hint
-                    Object rawOwnerHint = stack.get(stackIndexOfMethodResult);
-                    if (rawOwnerHint instanceof String) {
-                        JavaType ownerHint = JavaTypeImporter.createFromAsmObjectTypeName((String) rawOwnerHint);
-                        flow.putStackHint(stackIndexOfMethodResult, new RawHint(ownerHint, ownerHint, name, desc));
+                    for (RawHint hint : arguments) {
+                        flow.putStackHint(stackIndexOfInstance, hint);
                     }
+
+                    // Pop instance from stack hints
+                    flow.popStackHintsAt(stackIndexOfInstance);
                 }
 
-                for (RawHint hint : arguments) {
-                    flow.putStackHint(stackIndexOfMethodResult, hint);
+                // ... and the return value of the method
+                if (methodHasReturnValue) {
+                    int stackIndexOfMethodResult = stack.size() - parameterCount;
+
+                    if (opcode != Opcodes.INVOKESTATIC) {
+                        stackIndexOfMethodResult -= 1;
+
+                        // Add method owner as type hint
+                        Object rawOwnerHint = stack.get(stackIndexOfMethodResult);
+                        if (rawOwnerHint instanceof String) {
+                            JavaType ownerHint = JavaTypeImporter.createFromAsmObjectTypeName((String) rawOwnerHint);
+                            flow.putStackHint(stackIndexOfMethodResult, new RawHint(ownerHint, ownerHint, name, desc));
+                        }
+                    }
+
+                    for (RawHint hint : arguments) {
+                        flow.putStackHint(stackIndexOfMethodResult, hint);
+                    }
                 }
             }
 
