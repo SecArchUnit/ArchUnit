@@ -482,7 +482,7 @@ class JavaClassProcessor extends ClassVisitor {
                 LOG.info("visitReturnReferenceInsn, stack: {}", stack);
             }
 
-            flow.putReturnValueHints(flow.popStackHints(1));
+            flow.putReturnValueHints(flow.getArgumentHints(1));
         }
 
         private void visitArrayStoreInsn() {
