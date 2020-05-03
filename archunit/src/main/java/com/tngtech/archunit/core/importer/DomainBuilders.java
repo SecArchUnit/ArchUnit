@@ -234,8 +234,8 @@ public final class DomainBuilders {
     public static final class JavaMethodBuilder extends JavaCodeUnitBuilder<JavaMethod, JavaMethodBuilder> {
         private Optional<ValueBuilder> annotationDefaultValueBuilder = Optional.absent();
         private Supplier<Optional<Object>> annotationDefaultValue = Suppliers.ofInstance(Optional.absent());
-        private Collection<RawHint> rawReturnValueHints;
-        private Supplier<Collection<Hint>> returnValueHints;
+        private Set<RawHint> rawReturnValueHints;
+        private Supplier<Set<Hint>> returnValueHints;
 
         JavaMethodBuilder() {
         }
@@ -245,7 +245,7 @@ public final class DomainBuilders {
             return this;
         }
 
-        JavaMethodBuilder withReturnValueHints(Collection<RawHint> returnValueHints) {
+        JavaMethodBuilder withReturnValueHints(Set<RawHint> returnValueHints) {
             this.rawReturnValueHints = returnValueHints;
             return this;
         }
@@ -254,7 +254,7 @@ public final class DomainBuilders {
             return annotationDefaultValue;
         }
 
-        public Supplier<Collection<Hint>> getReturnValueHints() {
+        public Supplier<Set<Hint>> getReturnValueHints() {
             return returnValueHints;
         }
 
@@ -264,14 +264,14 @@ public final class DomainBuilders {
                 annotationDefaultValue = Suppliers.memoize(new DefaultValueSupplier(getOwner(), annotationDefaultValueBuilder.get(), importedClasses));
             }
 
-            returnValueHints = memoize(new Supplier<Collection<Hint>>() {
+            returnValueHints = memoize(new Supplier<Set<Hint>>() {
                 @Override
-                public Collection<Hint> get() {
+                public Set<Hint> get() {
                     if (rawReturnValueHints == null) {
                         return Collections.emptySet();
                     }
 
-                    Collection<Hint> hints = new HashSet<>();
+                    Set<Hint> hints = new HashSet<>();
                     for (RawHint rawHint : rawReturnValueHints) {
                         JavaMember memberOrigin = null;
                         if (rawHint.hasMember()) {
@@ -526,7 +526,7 @@ public final class DomainBuilders {
     public abstract static class JavaAccessBuilder<TARGET extends AccessTarget, SELF extends JavaAccessBuilder<TARGET, SELF>> {
         private JavaCodeUnit origin;
         private TARGET target;
-        private Collection<Hint> argumentHints;
+        private Set<Hint> argumentHints;
         private int lineNumber;
 
         private JavaAccessBuilder() {
@@ -542,7 +542,7 @@ public final class DomainBuilders {
             return self();
         }
 
-        SELF withArgumentHints(final Collection<Hint> argumentHints) {
+        SELF withArgumentHints(final Set<Hint> argumentHints) {
             this.argumentHints = argumentHints;
             return self();
         }
@@ -560,7 +560,7 @@ public final class DomainBuilders {
             return target;
         }
 
-        public Collection<Hint> getArgumentHints() {
+        public Set<Hint> getArgumentHints() {
             return argumentHints;
         }
 

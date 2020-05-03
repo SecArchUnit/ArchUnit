@@ -17,7 +17,6 @@ package com.tngtech.archunit.core.importer;
 
 import java.io.InputStream;
 import java.net.URI;
-import java.util.Collection;
 import java.util.Set;
 
 import com.tngtech.archunit.base.Optional;
@@ -138,7 +137,7 @@ class ClassFileProcessor {
         }
 
         @Override
-        public void handleFieldInstruction(int opcode, String owner, String name, String desc, Collection<RawHint> arguments) {
+        public void handleFieldInstruction(int opcode, String owner, String name, String desc, Set<RawHint> arguments) {
             AccessType accessType = AccessType.forOpCode(opcode);
             LOG.trace("Found {} access to field {}.{}:{} in line {}", accessType, owner, name, desc, lineNumber);
             TargetInfo target = new RawAccessRecord.FieldTargetInfo(owner, name, desc);
@@ -148,7 +147,7 @@ class ClassFileProcessor {
         }
 
         @Override
-        public void handleMethodInstruction(String owner, String name, String desc, Collection<RawHint> arguments) {
+        public void handleMethodInstruction(String owner, String name, String desc, Set<RawHint> arguments) {
             LOG.trace("Found call of method {}.{}:{} in line {}", owner, name, desc, lineNumber);
             if (CONSTRUCTOR_NAME.equals(name)) {
                 TargetInfo target = new ConstructorTargetInfo(owner, name, desc);
@@ -159,7 +158,7 @@ class ClassFileProcessor {
             }
         }
 
-        private <BUILDER extends RawAccessRecord.BaseBuilder<BUILDER>> BUILDER filled(BUILDER builder, TargetInfo target, Collection<RawHint> arguments) {
+        private <BUILDER extends RawAccessRecord.BaseBuilder<BUILDER>> BUILDER filled(BUILDER builder, TargetInfo target, Set<RawHint> arguments) {
             return builder
                     .withCaller(codeUnit)
                     .withTarget(target)

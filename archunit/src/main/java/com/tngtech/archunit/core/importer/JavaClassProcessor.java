@@ -335,7 +335,7 @@ class JavaClassProcessor extends ClassVisitor {
 
         @Override
         public void visitFieldInsn(int opcode, String owner, String name, String desc) {
-            Collection<RawHint> argumentHints = Collections.emptySet();
+            Set<RawHint> argumentHints = Collections.emptySet();
 
             if (JavaFieldAccess.AccessType.forOpCode(opcode) == SET) {
                 argumentHints = flow.getArgumentHints(1);
@@ -367,7 +367,7 @@ class JavaClassProcessor extends ClassVisitor {
         @Override
         public void visitMethodInsn(int opcode, String owner, String name, String desc, boolean itf) {
             int parameterCount = getParameterCount(desc);
-            Collection<RawHint> arguments = flow.getArgumentHints(parameterCount);
+            Set<RawHint> arguments = flow.getArgumentHints(parameterCount);
             boolean methodHasReturnValue = !desc.endsWith(")V") || CONSTRUCTOR_NAME.equals(name);
 
             if (logEverything) {
@@ -418,7 +418,7 @@ class JavaClassProcessor extends ClassVisitor {
             if ("makeConcatWithConstants".equals(name) && stack != null) {
                 int parameterCount = getParameterCount(descriptor);
                 int stackIndexOfResultingString = stack.size() - parameterCount;
-                Collection<RawHint> arguments = flow.getArgumentHints(parameterCount);
+                Set<RawHint> arguments = flow.getArgumentHints(parameterCount);
 
                 for (RawHint argument : arguments) {
                     flow.putStackHint(stackIndexOfResultingString, argument);
@@ -492,7 +492,7 @@ class JavaClassProcessor extends ClassVisitor {
             }
 
             int stackIndexOfTargetArray = stack.size() - 3;
-            Collection<RawHint> hints = flow.getArgumentHints(1);
+            Set<RawHint> hints = flow.getArgumentHints(1);
             for (RawHint hint : hints) {
                 flow.putStackHint(stackIndexOfTargetArray, hint);
             }
@@ -572,15 +572,15 @@ class JavaClassProcessor extends ClassVisitor {
         }
 
         private class InformationFlow {
-            private final Map<Integer, Collection<RawHint>> stackTypeHints = new HashMap<>();
-            private final Map<Integer, Collection<RawHint>> localVarTypeHints = new HashMap<>();
-            private final Collection<RawHint> returnValueTypeHints = new HashSet<>();
+            private final Map<Integer, Set<RawHint>> stackTypeHints = new HashMap<>();
+            private final Map<Integer, Set<RawHint>> localVarTypeHints = new HashMap<>();
+            private final Set<RawHint> returnValueTypeHints = new HashSet<>();
 
-            private void putReturnValueHints(Collection<RawHint> typeHints) {
+            private void putReturnValueHints(Set<RawHint> typeHints) {
                 returnValueTypeHints.addAll(typeHints);
             }
 
-            private Collection<RawHint> getReturnValueHints() {
+            private Set<RawHint> getReturnValueHints() {
                 return returnValueTypeHints;
             }
 
@@ -589,7 +589,7 @@ class JavaClassProcessor extends ClassVisitor {
                     LOG.info("putHint {} {}", stackIndex, typeHint);
                 }
 
-                Collection<RawHint> hints = stackTypeHints.get(stackIndex);
+                Set<RawHint> hints = stackTypeHints.get(stackIndex);
                 if (hints == null) {
                     hints = new HashSet<>();
                     stackTypeHints.put(stackIndex, hints);
@@ -598,16 +598,16 @@ class JavaClassProcessor extends ClassVisitor {
                 hints.add(typeHint);
             }
 
-            private Collection<RawHint> popStackHintsAt(int stackIndex) {
-                Collection<RawHint> hints = stackTypeHints.remove(stackIndex);
+            private Set<RawHint> popStackHintsAt(int stackIndex) {
+                Set<RawHint> hints = stackTypeHints.remove(stackIndex);
                 if (hints == null) {
                     hints = Collections.emptySet();
                 }
                 return hints;
             }
 
-            private Collection<RawHint> popStackHints(int argumentCount) {
-                Collection<RawHint> hints = new HashSet<>();
+            private Set<RawHint> popStackHints(int argumentCount) {
+                Set<RawHint> hints = new HashSet<>();
                 for (int i = 1; i <= argumentCount; i++) {
                     hints.addAll(popStackHintsAt(stack.size() - i));
                 }
@@ -619,7 +619,7 @@ class JavaClassProcessor extends ClassVisitor {
                     LOG.info("Linking stack index {} to {}", stackTarget, stackOrigin);
                 }
 
-                Collection<RawHint> hints = stackTypeHints.get(stackOrigin);
+                Set<RawHint> hints = stackTypeHints.get(stackOrigin);
                 if (hints == null) {
                     hints = new HashSet<>();
                     stackTypeHints.put(stackOrigin, hints);
@@ -629,7 +629,7 @@ class JavaClassProcessor extends ClassVisitor {
 
             private void storeLocalVar(int varIndex) {
                 int stackIndex = stack.size() - 1;
-                Collection<RawHint> hints = stackTypeHints.remove(stackIndex);
+                Set<RawHint> hints = stackTypeHints.remove(stackIndex);
                 if (hints != null) {
                     localVarTypeHints.put(varIndex, hints);
                 } else {
@@ -639,7 +639,7 @@ class JavaClassProcessor extends ClassVisitor {
 
             private void loadLocalVar(int varIndex) {
                 int stackIndex = stack.size() - 1;
-                Collection<RawHint> hints = localVarTypeHints.get(varIndex);
+                Set<RawHint> hints = localVarTypeHints.get(varIndex);
                 if (hints != null) {
                     stackTypeHints.put(stackIndex, hints);
                 } else {
@@ -647,7 +647,7 @@ class JavaClassProcessor extends ClassVisitor {
                 }
             }
 
-            private Collection<RawHint> getArgumentHints(int argumentCount) {
+            private Set<RawHint> getArgumentHints(int argumentCount) {
                 if (stack == null || argumentCount == 0) {
                     return Collections.emptySet();
                 }
@@ -719,18 +719,18 @@ class JavaClassProcessor extends ClassVisitor {
     }
 
     interface AccessHandler {
-        void handleFieldInstruction(int opcode, String owner, String name, String desc, Collection<RawHint> arguments);
+        void handleFieldInstruction(int opcode, String owner, String name, String desc, Set<RawHint> arguments);
 
         void setContext(CodeUnit codeUnit);
 
         void setLineNumber(int lineNumber);
 
-        void handleMethodInstruction(String owner, String name, String desc, Collection<RawHint> arguments);
+        void handleMethodInstruction(String owner, String name, String desc, Set<RawHint> arguments);
 
         @Internal
         class NoOp implements AccessHandler {
             @Override
-            public void handleFieldInstruction(int opcode, String owner, String name, String desc, Collection<RawHint> arguments) {
+            public void handleFieldInstruction(int opcode, String owner, String name, String desc, Set<RawHint> arguments) {
             }
 
             @Override
@@ -742,7 +742,7 @@ class JavaClassProcessor extends ClassVisitor {
             }
 
             @Override
-            public void handleMethodInstruction(String owner, String name, String desc, Collection<RawHint> arguments) {
+            public void handleMethodInstruction(String owner, String name, String desc, Set<RawHint> arguments) {
             }
         }
     }

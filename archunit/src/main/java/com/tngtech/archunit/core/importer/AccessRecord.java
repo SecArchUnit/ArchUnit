@@ -45,7 +45,7 @@ interface AccessRecord<TARGET extends AccessTarget> {
 
     TARGET getTarget();
 
-    Collection<Hint> getArgumentHints();
+    Set<Hint> getArgumentHints();
 
     int getLineNumber();
 
@@ -91,7 +91,7 @@ interface AccessRecord<TARGET extends AccessTarget> {
             private final ImportedClasses classes;
             private final JavaClass targetOwner;
             private final Supplier<JavaCodeUnit> callerSupplier;
-            private final Collection<Hint> argumentHints;
+            private final Set<Hint> argumentHints;
 
             RawConstructorCallRecordProcessed(RawAccessRecord record, ImportedClasses classes) {
                 this.record = record;
@@ -127,7 +127,7 @@ interface AccessRecord<TARGET extends AccessTarget> {
             }
 
             @Override
-            public Collection<Hint> getArgumentHints() {
+            public Set<Hint> getArgumentHints() {
                 return argumentHints;
             }
 
@@ -157,7 +157,7 @@ interface AccessRecord<TARGET extends AccessTarget> {
             final ImportedClasses classes;
             private final JavaClass targetOwner;
             private final Supplier<JavaCodeUnit> callerSupplier;
-            private final Collection<Hint> argumentHints;
+            private final Set<Hint> argumentHints;
 
             RawMethodCallRecordProcessed(RawAccessRecord record, ImportedClasses classes) {
                 this.record = record;
@@ -194,7 +194,7 @@ interface AccessRecord<TARGET extends AccessTarget> {
             }
 
             @Override
-            public Collection<Hint> getArgumentHints() {
+            public Set<Hint> getArgumentHints() {
                 return argumentHints;
             }
 
@@ -224,7 +224,7 @@ interface AccessRecord<TARGET extends AccessTarget> {
             final ImportedClasses classes;
             private final JavaClass targetOwner;
             private final Supplier<JavaCodeUnit> callerSupplier;
-            private final Collection<Hint> argumentHints;
+            private final Set<Hint> argumentHints;
 
             RawFieldAccessRecordProcessed(RawAccessRecord.ForField record, ImportedClasses classes) {
                 this.record = record;
@@ -264,7 +264,7 @@ interface AccessRecord<TARGET extends AccessTarget> {
             }
 
             @Override
-            public Collection<Hint> getArgumentHints() {
+            public Set<Hint> getArgumentHints() {
                 return argumentHints;
             }
 

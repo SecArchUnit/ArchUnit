@@ -15,8 +15,8 @@
  */
 package com.tngtech.archunit.core.domain;
 
-import java.util.Collection;
 import java.util.Objects;
+import java.util.Set;
 
 import com.tngtech.archunit.PublicAPI;
 import com.tngtech.archunit.base.ChainableFunction;
@@ -36,7 +36,7 @@ public abstract class JavaAccess<TARGET extends AccessTarget>
 
     private final JavaCodeUnit origin;
     private final TARGET target;
-    private final Collection<Hint> argumentHints;
+    private final Set<Hint> argumentHints;
     private final int lineNumber;
     private final int hashCode;
     private final SourceCodeLocation sourceCodeLocation;
@@ -77,7 +77,7 @@ public abstract class JavaAccess<TARGET extends AccessTarget>
     }
 
     @PublicAPI(usage = ACCESS)
-    public Collection<Hint> getArgumentHints() {
+    public Set<Hint> getArgumentHints() {
         return argumentHints;
     }
 

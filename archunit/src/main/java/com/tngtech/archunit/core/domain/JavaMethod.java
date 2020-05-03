@@ -16,7 +16,6 @@
 package com.tngtech.archunit.core.domain;
 
 import java.lang.reflect.Method;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Set;
 
@@ -38,7 +37,7 @@ public class JavaMethod extends JavaCodeUnit {
     private final ThrowsClause<JavaMethod> throwsClause;
     private Supplier<Set<JavaMethodCall>> callsToSelf = Suppliers.ofInstance(Collections.<JavaMethodCall>emptySet());
     private final Supplier<Optional<Object>> annotationDefaultValue;
-    private final Supplier<Collection<Hint>> returnValueHints;
+    private final Supplier<Set<Hint>> returnValueHints;
 
     JavaMethod(DomainBuilders.JavaMethodBuilder builder) {
         super(builder);
@@ -72,7 +71,7 @@ public class JavaMethod extends JavaCodeUnit {
     }
 
     @PublicAPI(usage = ACCESS)
-    public Collection<Hint> getReturnValueHints() {
+    public Set<Hint> getReturnValueHints() {
         return returnValueHints.get();
     }
 

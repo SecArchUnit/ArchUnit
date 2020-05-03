@@ -36,10 +36,10 @@ import static java.util.regex.Pattern.quote;
 class RawAccessRecord {
     final CodeUnit caller;
     final TargetInfo target;
-    final Collection<RawHint> arguments;
+    final Set<RawHint> arguments;
     final int lineNumber;
 
-    RawAccessRecord(CodeUnit caller, TargetInfo target, Collection<RawHint> arguments, int lineNumber) {
+    RawAccessRecord(CodeUnit caller, TargetInfo target, Set<RawHint> arguments, int lineNumber) {
         this.caller = checkNotNull(caller);
         this.target = checkNotNull(target);
         this.arguments = checkNotNull(arguments);
@@ -399,7 +399,7 @@ class RawAccessRecord {
         CodeUnit caller;
         TargetInfo target;
         int lineNumber = -1;
-        Collection<RawHint> argumentHints;
+        Set<RawHint> argumentHints;
 
         SELF withCaller(CodeUnit caller) {
             this.caller = caller;
@@ -411,7 +411,7 @@ class RawAccessRecord {
             return self();
         }
 
-        SELF withArgumentHints(Collection<RawHint> arguments) {
+        SELF withArgumentHints(Set<RawHint> arguments) {
             this.argumentHints = arguments;
             return self();
         }
@@ -434,7 +434,7 @@ class RawAccessRecord {
     static class ForField extends RawAccessRecord {
         final AccessType accessType;
 
-        private ForField(CodeUnit caller, TargetInfo target, Collection<RawHint> arguments, int lineNumber, AccessType accessType) {
+        private ForField(CodeUnit caller, TargetInfo target, Set<RawHint> arguments, int lineNumber, AccessType accessType) {
             super(caller, target, arguments, lineNumber);
             this.accessType = accessType;
         }
