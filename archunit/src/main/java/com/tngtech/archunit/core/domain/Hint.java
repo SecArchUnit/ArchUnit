@@ -18,20 +18,20 @@ package com.tngtech.archunit.core.domain;
 import java.util.Objects;
 
 public class Hint {
-    private final JavaClass javaClass;
-    private final JavaMember javaMemberOrigin;
+    private final JavaClass type;
+    private final JavaMember memberOrigin;
 
-    public Hint(JavaClass javaClass, JavaMember memberOrigin) {
-        this.javaClass = javaClass;
-        this.javaMemberOrigin = memberOrigin;
+    public Hint(JavaClass type, JavaMember memberOrigin) {
+        this.type = type;
+        this.memberOrigin = memberOrigin;
     }
 
-    public JavaClass getJavaClass() {
-        return javaClass;
+    public JavaClass getType() {
+        return type;
     }
 
     public JavaMember getMemberOrigin() {
-        return javaMemberOrigin;
+        return memberOrigin;
     }
 
     @Override
@@ -39,12 +39,12 @@ public class Hint {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         Hint hint = (Hint) o;
-        return javaClass.equals(hint.javaClass) &&
-                Objects.equals(javaMemberOrigin, hint.javaMemberOrigin);
+        return type.equals(hint.type) &&
+                Objects.equals(memberOrigin, hint.memberOrigin);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(javaClass, javaMemberOrigin);
+        return Objects.hash(type, memberOrigin);
     }
 }
