@@ -369,6 +369,7 @@ class JavaClassProcessor extends ClassVisitor {
             int parameterCount = getParameterCount(desc);
             Set<RawHint> arguments = flow.getArgumentHints(parameterCount);
             boolean methodHasReturnValue = !desc.endsWith(")V") || CONSTRUCTOR_NAME.equals(name);
+            Set<RawHint> instanceHints = Collections.emptySet();
 
             if (logEverything) {
                 LOG.info("visitMethodInsn {}, {}, {}, {}", opcode, owner, name, desc);
@@ -391,7 +392,7 @@ class JavaClassProcessor extends ClassVisitor {
                     }
 
                     // Pop instance from stack hints
-                    flow.popStackHintsAt(stackIndexOfInstance);
+                    instanceHints = flow.popStackHintsAt(stackIndexOfInstance);
                 }
 
                 // ... and the return value of the method
@@ -410,6 +411,10 @@ class JavaClassProcessor extends ClassVisitor {
                     }
 
                     for (RawHint hint : arguments) {
+                        flow.putStackHint(stackIndexOfMethodResult, hint);
+                    }
+
+                    for (RawHint hint : instanceHints) {
                         flow.putStackHint(stackIndexOfMethodResult, hint);
                     }
                 }
