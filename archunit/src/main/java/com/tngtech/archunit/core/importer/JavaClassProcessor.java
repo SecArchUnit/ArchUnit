@@ -482,6 +482,11 @@ class JavaClassProcessor extends ClassVisitor {
                 visitArrayStoreInsn();
             }
 
+            if (opcode == Opcodes.AALOAD) {
+                // Array and result are in the same stack index
+                // By not doing anything, the array hints are "transferred" into the result
+            }
+
             if (opcode == Opcodes.ARETURN) {
                 visitReturnReferenceInsn();
             }
