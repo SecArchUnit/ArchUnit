@@ -19,7 +19,6 @@ import java.lang.reflect.Array;
 import java.net.URI;
 import java.util.*;
 
-import com.google.common.base.CharMatcher;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -43,6 +42,11 @@ import org.objectweb.asm.*;
 import org.objectweb.asm.commons.AnalyzerAdapter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import sun.reflect.generics.parser.SignatureParser;
+import sun.reflect.generics.tree.DoubleSignature;
+import sun.reflect.generics.tree.LongSignature;
+import sun.reflect.generics.tree.MethodTypeSignature;
+import sun.reflect.generics.tree.TypeSignature;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
@@ -307,10 +311,17 @@ class JavaClassProcessor extends ClassVisitor {
                 LOG.info("Method {}.{}", declaringClassName, name);
         }
 
-        public int getParameterCount(String methodDescriptor) {
-            methodDescriptor = methodDescriptor.substring(0, methodDescriptor.indexOf(')'));
-            int parameterCount = CharMatcher.is(';').countIn(methodDescriptor);
-            return parameterCount;
+        public int getArgumentCount(String methodDescriptor) {
+            MethodTypeSignature signature = SignatureParser.make().parseMethodSig(methodDescriptor);
+            int argumentCount = signature.getParameterTypes().length;
+
+            for (TypeSignature type : signature.getParameterTypes()) {
+                if (type instanceof LongSignature || type instanceof DoubleSignature) {
+                    argumentCount += 1;
+                }
+            }
+
+            return argumentCount;
         }
 
         @Override
@@ -366,8 +377,8 @@ class JavaClassProcessor extends ClassVisitor {
 
         @Override
         public void visitMethodInsn(int opcode, String owner, String name, String desc, boolean itf) {
-            int parameterCount = getParameterCount(desc);
-            Set<RawHint> arguments = flow.getArgumentHints(parameterCount);
+            int argumentCount = getArgumentCount(desc);
+            Set<RawHint> arguments = flow.getArgumentHints(argumentCount);
             boolean methodHasReturnValue = !desc.endsWith(")V") || CONSTRUCTOR_NAME.equals(name);
             Set<RawHint> instanceHints = Collections.emptySet();
 
@@ -385,7 +396,7 @@ class JavaClassProcessor extends ClassVisitor {
 
                 // ... the instance this method was invoked on...
                 if (opcode != Opcodes.INVOKESTATIC) {
-                    int stackIndexOfInstance = stack.size() - parameterCount;
+                    int stackIndexOfInstance = stack.size() - argumentCount;
 
                     for (RawHint hint : arguments) {
                         flow.putStackHint(stackIndexOfInstance, hint);
@@ -397,7 +408,7 @@ class JavaClassProcessor extends ClassVisitor {
 
                 // ... and the return value of the method
                 if (methodHasReturnValue) {
-                    int stackIndexOfMethodResult = stack.size() - parameterCount;
+                    int stackIndexOfMethodResult = stack.size() - argumentCount;
 
                     if (opcode != Opcodes.INVOKESTATIC) {
                         stackIndexOfMethodResult -= 1;
@@ -438,9 +449,9 @@ class JavaClassProcessor extends ClassVisitor {
 
             // Java 9+ string concatenation
             if ("makeConcatWithConstants".equals(name) && stack != null) {
-                int parameterCount = getParameterCount(descriptor);
-                int stackIndexOfResultingString = stack.size() - parameterCount;
-                Set<RawHint> arguments = flow.getArgumentHints(parameterCount);
+                int argumentCount = getArgumentCount(descriptor);
+                int stackIndexOfResultingString = stack.size() - argumentCount;
+                Set<RawHint> arguments = flow.getArgumentHints(argumentCount);
 
                 for (RawHint argument : arguments) {
                     flow.putStackHint(stackIndexOfResultingString, argument);

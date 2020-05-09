@@ -65,12 +65,13 @@ public class RawHint {
                     return member;
                 }
             }
+
+            // Member is inherited from Object; it's fine to return null
         } catch (NullPointerException e) {
             System.err.println("Tried to get members before they have been processed, raw hint: " + this);
-            return null;
         }
 
-        throw new RuntimeException("Unable to resolve origin member of raw hint " + this);
+        return null;
     }
 
     @Override
