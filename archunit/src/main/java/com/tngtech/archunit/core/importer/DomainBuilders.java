@@ -47,9 +47,11 @@ public final class DomainBuilders {
 
     static <T extends HasDescription> Map<String, JavaAnnotation<T>> buildAnnotations(T owner, Set<JavaAnnotationBuilder> annotations, ClassesByTypeName importedClasses) {
         ImmutableMap.Builder<String, JavaAnnotation<T>> result = ImmutableMap.builder();
-        for (JavaAnnotationBuilder annotationBuilder : annotations) {
-            JavaAnnotation<T> javaAnnotation = annotationBuilder.build(owner, importedClasses);
-            result.put(javaAnnotation.getRawType().getName(), javaAnnotation);
+        if (annotations != null) {
+            for (JavaAnnotationBuilder annotationBuilder : annotations) {
+                JavaAnnotation<T> javaAnnotation = annotationBuilder.build(owner, importedClasses);
+                result.put(javaAnnotation.getRawType().getName(), javaAnnotation);
+            }
         }
         return result.build();
     }
