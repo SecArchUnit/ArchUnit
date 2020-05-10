@@ -47,4 +47,12 @@ public class Hint {
     public int hashCode() {
         return Objects.hash(type, memberOrigin);
     }
+
+    @Override
+    public String toString() {
+        return "Hint{" +
+                "type=" + type +
+                ", memberOrigin=" + memberOrigin +
+                '}';
+    }
 }

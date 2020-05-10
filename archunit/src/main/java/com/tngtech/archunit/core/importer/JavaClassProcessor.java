@@ -498,8 +498,8 @@ class JavaClassProcessor extends ClassVisitor {
                 // By not doing anything, the array hints are "transferred" into the result
             }
 
-            if (opcode == Opcodes.ARETURN) {
-                visitReturnReferenceInsn();
+            if (opcode >= Opcodes.IRETURN && opcode <= Opcodes.ARETURN) {
+                visitReturnInsn(opcode);
             }
 
             // ^^^ Before stack changes
@@ -511,16 +511,21 @@ class JavaClassProcessor extends ClassVisitor {
             }
         }
 
-        private void visitReturnReferenceInsn() {
+        private void visitReturnInsn(int opcode) {
             if (stack == null) {
                 return;
             }
 
             if (logEverything) {
-                LOG.info("visitReturnReferenceInsn, stack: {}", stack);
+                LOG.info("visitReturnInsn, {}, stack: {}", opcode, stack);
             }
 
-            flow.putReturnValueHints(flow.getArgumentHints(1));
+            int argumentCount = 1;
+            if (opcode == Opcodes.DRETURN || opcode == Opcodes.LRETURN) {
+                argumentCount = 2;
+            }
+
+            flow.putReturnValueHints(flow.getArgumentHints(argumentCount));
         }
 
         private void visitArrayStoreInsn() {
