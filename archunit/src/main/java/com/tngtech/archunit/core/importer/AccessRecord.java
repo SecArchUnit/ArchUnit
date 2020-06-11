@@ -15,27 +15,18 @@
  */
 package com.tngtech.archunit.core.importer;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableSet;
 import com.tngtech.archunit.Internal;
 import com.tngtech.archunit.base.Optional;
-import com.tngtech.archunit.core.domain.AccessTarget;
+import com.tngtech.archunit.core.domain.*;
 import com.tngtech.archunit.core.domain.AccessTarget.ConstructorCallTarget;
 import com.tngtech.archunit.core.domain.AccessTarget.FieldAccessTarget;
 import com.tngtech.archunit.core.domain.AccessTarget.MethodCallTarget;
-import com.tngtech.archunit.core.domain.JavaClass;
-import com.tngtech.archunit.core.domain.JavaClassList;
-import com.tngtech.archunit.core.domain.JavaCodeUnit;
-import com.tngtech.archunit.core.domain.JavaConstructor;
-import com.tngtech.archunit.core.domain.JavaField;
 import com.tngtech.archunit.core.domain.JavaFieldAccess.AccessType;
-import com.tngtech.archunit.core.domain.JavaMethod;
 import com.tngtech.archunit.core.domain.properties.HasDescriptor;
 import com.tngtech.archunit.core.domain.properties.HasName;
 import com.tngtech.archunit.core.domain.properties.HasOwner;
@@ -53,6 +44,8 @@ interface AccessRecord<TARGET extends AccessTarget> {
     JavaCodeUnit getCaller();
 
     TARGET getTarget();
+
+    Set<Hint> getArgumentHints();
 
     int getLineNumber();
 
@@ -98,12 +91,21 @@ interface AccessRecord<TARGET extends AccessTarget> {
             private final ImportedClasses classes;
             private final JavaClass targetOwner;
             private final Supplier<JavaCodeUnit> callerSupplier;
+            private final Set<Hint> argumentHints;
 
             RawConstructorCallRecordProcessed(RawAccessRecord record, ImportedClasses classes) {
                 this.record = record;
                 this.classes = classes;
                 targetOwner = this.classes.getOrResolve(record.target.owner.getName());
                 callerSupplier = createCallerSupplier(record.caller, classes);
+                argumentHints = new HashSet<>();
+                for (RawHint rawHint : record.arguments) {
+                    JavaMember memberOrigin = null;
+                    if (rawHint.hasMember()) {
+                        memberOrigin = rawHint.resolveMemberIn(classes.getOrResolve(rawHint.getMemberOwner().getName()));
+                    }
+                    argumentHints.add(new Hint(classes.getOrResolve(rawHint.getType().getName()), memberOrigin));
+                }
             }
 
             @Override
@@ -122,6 +124,11 @@ interface AccessRecord<TARGET extends AccessTarget> {
                         .withReturnType(returnType)
                         .withConstructor(constructorSupplier)
                         .build();
+            }
+
+            @Override
+            public Set<Hint> getArgumentHints() {
+                return argumentHints;
             }
 
             @Override
@@ -150,12 +157,21 @@ interface AccessRecord<TARGET extends AccessTarget> {
             final ImportedClasses classes;
             private final JavaClass targetOwner;
             private final Supplier<JavaCodeUnit> callerSupplier;
+            private final Set<Hint> argumentHints;
 
             RawMethodCallRecordProcessed(RawAccessRecord record, ImportedClasses classes) {
                 this.record = record;
                 this.classes = classes;
                 targetOwner = this.classes.getOrResolve(record.target.owner.getName());
                 callerSupplier = createCallerSupplier(record.caller, classes);
+                argumentHints = new HashSet<>();
+                for (RawHint rawHint : record.arguments) {
+                    JavaMember memberOrigin = null;
+                    if (rawHint.hasMember()) {
+                        memberOrigin = rawHint.resolveMemberIn(classes.getOrResolve(rawHint.getMemberOwner().getName()));
+                    }
+                    argumentHints.add(new Hint(classes.getOrResolve(rawHint.getType().getName()), memberOrigin));
+                }
             }
 
             @Override
@@ -175,6 +191,11 @@ interface AccessRecord<TARGET extends AccessTarget> {
                         .withReturnType(returnType)
                         .withMethods(methodsSupplier)
                         .build();
+            }
+
+            @Override
+            public Set<Hint> getArgumentHints() {
+                return argumentHints;
             }
 
             @Override
@@ -203,12 +224,21 @@ interface AccessRecord<TARGET extends AccessTarget> {
             final ImportedClasses classes;
             private final JavaClass targetOwner;
             private final Supplier<JavaCodeUnit> callerSupplier;
+            private final Set<Hint> argumentHints;
 
             RawFieldAccessRecordProcessed(RawAccessRecord.ForField record, ImportedClasses classes) {
                 this.record = record;
                 this.classes = classes;
                 targetOwner = this.classes.getOrResolve(record.target.owner.getName());
                 callerSupplier = createCallerSupplier(record.caller, classes);
+                argumentHints = new HashSet<>();
+                for (RawHint rawHint : record.arguments) {
+                    JavaMember memberOrigin = null;
+                    if (rawHint.hasMember()) {
+                        memberOrigin = rawHint.resolveMemberIn(classes.getOrResolve(rawHint.getMemberOwner().getName()));
+                    }
+                    argumentHints.add(new Hint(classes.getOrResolve(rawHint.getType().getName()), memberOrigin));
+                }
             }
 
             @Override
@@ -231,6 +261,11 @@ interface AccessRecord<TARGET extends AccessTarget> {
                         .withType(fieldType)
                         .withField(fieldSupplier)
                         .build();
+            }
+
+            @Override
+            public Set<Hint> getArgumentHints() {
+                return argumentHints;
             }
 
             @Override

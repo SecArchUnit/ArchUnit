@@ -96,15 +96,6 @@ public class JavaTypeTest {
     }
 
     @Test
-    public void special_chars_type() {
-        JavaType specialChars = JavaType.From.name("s_123_wéirdâ.Weird_αρετη_Type");
-
-        assertThat(specialChars.getName()).isEqualTo("s_123_wéirdâ.Weird_αρετη_Type");
-        assertThat(specialChars.getSimpleName()).isEqualTo("Weird_αρετη_Type");
-        assertThat(specialChars.getPackageName()).isEqualTo("s_123_wéirdâ");
-    }
-
-    @Test
     public void default_package() {
         JavaType specialChars = JavaType.From.name("DefaultPackage");
 

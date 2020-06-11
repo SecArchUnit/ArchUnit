@@ -17,12 +17,7 @@ package com.tngtech.archunit.core.importer;
 
 import java.lang.reflect.Array;
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -40,28 +35,25 @@ import com.tngtech.archunit.base.Function;
 import com.tngtech.archunit.base.HasDescription;
 import com.tngtech.archunit.base.Optional;
 import com.tngtech.archunit.core.MayResolveTypesViaReflection;
-import com.tngtech.archunit.core.domain.JavaAnnotation;
-import com.tngtech.archunit.core.domain.JavaClass;
-import com.tngtech.archunit.core.domain.JavaEnumConstant;
-import com.tngtech.archunit.core.domain.JavaMethod;
-import com.tngtech.archunit.core.domain.JavaModifier;
-import com.tngtech.archunit.core.domain.JavaType;
+import com.tngtech.archunit.core.domain.*;
 import com.tngtech.archunit.core.importer.DomainBuilders.JavaAnnotationBuilder.ValueBuilder;
 import com.tngtech.archunit.core.importer.RawAccessRecord.CodeUnit;
-import org.objectweb.asm.AnnotationVisitor;
-import org.objectweb.asm.ClassVisitor;
-import org.objectweb.asm.FieldVisitor;
-import org.objectweb.asm.Label;
-import org.objectweb.asm.MethodVisitor;
-import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.Type;
+import org.objectweb.asm.*;
+import org.objectweb.asm.commons.AnalyzerAdapter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import sun.reflect.generics.parser.SignatureParser;
+import sun.reflect.generics.tree.DoubleSignature;
+import sun.reflect.generics.tree.LongSignature;
+import sun.reflect.generics.tree.MethodTypeSignature;
+import sun.reflect.generics.tree.TypeSignature;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.nullToEmpty;
 import static com.tngtech.archunit.core.domain.JavaConstructor.CONSTRUCTOR_NAME;
+import static com.tngtech.archunit.core.domain.JavaFieldAccess.AccessType.GET;
+import static com.tngtech.archunit.core.domain.JavaFieldAccess.AccessType.SET;
 import static com.tngtech.archunit.core.domain.JavaStaticInitializer.STATIC_INITIALIZER_NAME;
 import static com.tngtech.archunit.core.importer.ClassFileProcessor.ASM_API_VERSION;
 
@@ -233,7 +225,7 @@ class JavaClassProcessor extends ClassVisitor {
                 .withDescriptor(desc)
                 .withThrowsClause(typesFrom(exceptions));
 
-        return new MethodProcessor(className, accessHandler, codeUnitBuilder);
+        return new MethodProcessor(access, name, desc, className, accessHandler, codeUnitBuilder);
     }
 
     private List<JavaType> typesFrom(Type[] asmTypes) {
@@ -297,41 +289,268 @@ class JavaClassProcessor extends ClassVisitor {
         return result.build();
     }
 
-    private static class MethodProcessor extends MethodVisitor {
+    private static class MethodProcessor extends AnalyzerAdapter {
         private final String declaringClassName;
+        private final String name;
         private final AccessHandler accessHandler;
         private final DomainBuilders.JavaCodeUnitBuilder<?, ?> codeUnitBuilder;
         private final Set<DomainBuilders.JavaAnnotationBuilder> annotations = new HashSet<>();
         private int actualLineNumber;
+        private boolean logEverything;
+        private InformationFlow flow;
 
-        MethodProcessor(String declaringClassName, AccessHandler accessHandler, DomainBuilders.JavaCodeUnitBuilder<?, ?> codeUnitBuilder) {
-            super(ASM_API_VERSION);
+        MethodProcessor(int access, String name, String desc, String declaringClassName, AccessHandler accessHandler, DomainBuilders.JavaCodeUnitBuilder<?, ?> codeUnitBuilder) {
+            super(ASM_API_VERSION, declaringClassName, access, name, desc, null);
             this.declaringClassName = declaringClassName;
+            this.name = name;
             this.accessHandler = accessHandler;
             this.codeUnitBuilder = codeUnitBuilder;
+            this.logEverything = declaringClassName.startsWith("cz.jiripinkas.jba.investigation.");
+            this.flow = new InformationFlow();
+            if (logEverything)
+                LOG.info("Method {}.{}", declaringClassName, name);
+        }
+
+        public int getArgumentCount(String methodDescriptor) {
+            MethodTypeSignature signature = SignatureParser.make().parseMethodSig(methodDescriptor);
+            int argumentCount = signature.getParameterTypes().length;
+
+            for (TypeSignature type : signature.getParameterTypes()) {
+                if (type instanceof LongSignature || type instanceof DoubleSignature) {
+                    argumentCount += 1;
+                }
+            }
+
+            return argumentCount;
         }
 
         @Override
         public void visitCode() {
+            super.visitCode();
+
             actualLineNumber = 0;
         }
 
         // NOTE: ASM does not reliably visit this method, so if this method is skipped, line number 0 is recorded
         @Override
         public void visitLineNumber(int line, Label start) {
-            LOG.trace("Examining line number {}", line);
+            super.visitLineNumber(line, start);
+
+            if (logEverything)
+                LOG.info("Examining line number {}", line);
+            else
+                LOG.trace("Examining line number {}", line);
             actualLineNumber = line;
             accessHandler.setLineNumber(actualLineNumber);
         }
 
         @Override
         public void visitFieldInsn(int opcode, String owner, String name, String desc) {
-            accessHandler.handleFieldInstruction(opcode, owner, name, desc);
+            Set<RawHint> argumentHints = Collections.emptySet();
+
+            if (JavaFieldAccess.AccessType.forOpCode(opcode) == SET) {
+                argumentHints = flow.getArgumentHints(1);
+            }
+
+            if (logEverything) {
+                LOG.info("visitFieldInsn {}, {}, {}, {}, {}", JavaFieldAccess.AccessType.forOpCode(opcode), owner, name, desc);
+                LOG.info("stack before: {}", stack);
+                LOG.info("arguments: {}", argumentHints);
+            }
+
+            accessHandler.handleFieldInstruction(opcode, owner, name, desc, argumentHints);
+            super.visitFieldInsn(opcode, owner, name, desc);
+
+            if (JavaFieldAccess.AccessType.forOpCode(opcode) == GET && stack != null) {
+                if (logEverything) {
+                    LOG.info("getFieldInsn {} {}", desc, owner);
+                }
+
+                RawHint hint = new RawHint(
+                        JavaTypeImporter.importAsmType(Type.getType(desc)),
+                        JavaTypeImporter.createFromAsmObjectTypeName(owner),
+                        name, desc);
+
+                flow.putStackHint(stack.size() - 1, hint);
+            }
         }
 
         @Override
         public void visitMethodInsn(int opcode, String owner, String name, String desc, boolean itf) {
-            accessHandler.handleMethodInstruction(owner, name, desc);
+            int argumentCount = getArgumentCount(desc);
+            Set<RawHint> arguments = flow.getArgumentHints(argumentCount);
+            boolean methodHasReturnValue = !desc.endsWith(")V") || CONSTRUCTOR_NAME.equals(name);
+            Set<RawHint> instanceHints = Collections.emptySet();
+
+            if (logEverything) {
+                LOG.info("visitMethodInsn {}, {}, {}, {}", opcode, owner, name, desc);
+                LOG.info("stack before: {}", stack);
+                LOG.info("arguments: {}", arguments);
+            }
+
+            accessHandler.handleMethodInstruction(owner, name, desc, arguments);
+
+            // Handle flow of hints
+            if (stack != null) {
+                // Argument hints flow into...
+
+                // ... the instance this method was invoked on...
+                if (opcode != Opcodes.INVOKESTATIC) {
+                    int stackIndexOfInstance = stack.size() - argumentCount;
+
+                    for (RawHint hint : arguments) {
+                        flow.putStackHint(stackIndexOfInstance, hint);
+                    }
+
+                    // Pop instance from stack hints
+                    instanceHints = flow.popStackHintsAt(stackIndexOfInstance);
+                }
+
+                // ... and the return value of the method
+                if (methodHasReturnValue) {
+                    int stackIndexOfMethodResult = stack.size() - argumentCount;
+
+                    if (opcode != Opcodes.INVOKESTATIC) {
+                        stackIndexOfMethodResult -= 1;
+
+                        // Add method owner as type hint
+                        Object rawOwnerHint = stack.get(stackIndexOfMethodResult);
+                        if (rawOwnerHint instanceof String) {
+                            JavaType ownerHint = JavaTypeImporter.createFromAsmObjectTypeName((String) rawOwnerHint);
+                            flow.putStackHint(stackIndexOfMethodResult, new RawHint(ownerHint, ownerHint, name, desc));
+                        }
+                    }
+
+                    for (RawHint hint : arguments) {
+                        flow.putStackHint(stackIndexOfMethodResult, hint);
+                    }
+
+                    for (RawHint hint : instanceHints) {
+                        flow.putStackHint(stackIndexOfMethodResult, hint);
+                    }
+                }
+            }
+
+            // ^^^ Before stack changes
+            super.visitMethodInsn(opcode, owner, name, desc, itf);
+            // vvv After stack changes
+
+            if (logEverything) {
+                LOG.info("stack after: {}", stack);
+            }
+        }
+
+        @Override
+        public void visitInvokeDynamicInsn(String name, String descriptor, Handle bootstrapMethodHandle, Object... bootstrapMethodArguments) {
+            if (logEverything) {
+                LOG.info("visitInvokeDynamicInsn {}, {}, {}, {}", name, descriptor, bootstrapMethodHandle, Arrays.toString(bootstrapMethodArguments));
+                LOG.info("stack before: {}", stack);
+            }
+
+            // Java 9+ string concatenation
+            if ("makeConcatWithConstants".equals(name) && stack != null) {
+                int argumentCount = getArgumentCount(descriptor);
+                int stackIndexOfResultingString = stack.size() - argumentCount;
+                Set<RawHint> arguments = flow.getArgumentHints(argumentCount);
+
+                for (RawHint argument : arguments) {
+                    flow.putStackHint(stackIndexOfResultingString, argument);
+                }
+            }
+
+            // ^^^ Before stack changes
+            super.visitInvokeDynamicInsn(name, descriptor, bootstrapMethodHandle, bootstrapMethodArguments);
+        }
+
+        @Override
+        public void visitVarInsn(int opcode, int var) {
+            if (logEverything) {
+                LOG.info("visitVarInsn {}, {}", opcode, var);
+                LOG.info("stack before: {}", stack);
+            }
+
+            if (opcode == Opcodes.ASTORE && stack != null) {
+                // Pop top of stack into local variable
+                flow.storeLocalVar(var);
+            }
+
+            // ^^^ Before stack changes
+            super.visitVarInsn(opcode, var);
+            // vvv After stack changes
+
+            if (opcode == Opcodes.ALOAD && stack != null) {
+                // Push local variable onto stack
+                flow.loadLocalVar(var);
+            }
+
+            if (logEverything)
+                LOG.info("stack after: {}", stack);
+        }
+
+        @Override
+        public void visitInsn(int opcode) {
+            if (opcode == Opcodes.AASTORE) {
+                visitArrayStoreInsn();
+            }
+
+            if (opcode == Opcodes.AALOAD) {
+                // Array and result are in the same stack index
+                // By not doing anything, the array hints are "transferred" into the result
+            }
+
+            if (opcode >= Opcodes.IRETURN && opcode <= Opcodes.ARETURN) {
+                visitReturnInsn(opcode);
+            }
+
+            // ^^^ Before stack changes
+            super.visitInsn(opcode);
+            // vvv After stack changes
+
+            if (opcode == Opcodes.DUP) {
+                visitDupInsn();
+            }
+        }
+
+        private void visitReturnInsn(int opcode) {
+            if (stack == null) {
+                return;
+            }
+
+            if (logEverything) {
+                LOG.info("visitReturnInsn, {}, stack: {}", opcode, stack);
+            }
+
+            int argumentCount = 1;
+            if (opcode == Opcodes.DRETURN || opcode == Opcodes.LRETURN) {
+                argumentCount = 2;
+            }
+
+            flow.putReturnValueHints(flow.getArgumentHints(argumentCount));
+        }
+
+        private void visitArrayStoreInsn() {
+            if (logEverything) {
+                LOG.info("visitArrayStoreInsn");
+                LOG.info("stack before: {}", stack);
+            }
+
+            int stackIndexOfTargetArray = stack.size() - 3;
+            Set<RawHint> hints = flow.getArgumentHints(1);
+            for (RawHint hint : hints) {
+                flow.putStackHint(stackIndexOfTargetArray, hint);
+            }
+        }
+
+        private void visitDupInsn() {
+            if (stack == null) {
+                return;
+            }
+
+            int originIndex = stack.size() - 2;
+            int destinationIndex = stack.size() - 1;
+
+            // When a reference is duplicated, also duplicate the type hints
+            flow.linkStackHints(originIndex, destinationIndex);
         }
 
         @Override
@@ -347,6 +566,15 @@ class JavaClassProcessor extends ClassVisitor {
         @Override
         public void visitEnd() {
             codeUnitBuilder.withAnnotations(annotations);
+            if (codeUnitBuilder instanceof DomainBuilders.JavaMethodBuilder) {
+                // Add return value hints
+                ((DomainBuilders.JavaMethodBuilder) codeUnitBuilder).withReturnValueHints(flow.getReturnValueHints());
+                if (logEverything) {
+                    LOG.info("visitEnd, arguments {}", flow.getReturnValueHints());
+                }
+            }
+
+            super.visitEnd();
         }
 
         private static class AnnotationDefaultProcessor extends AnnotationVisitor {
@@ -384,6 +612,104 @@ class JavaClassProcessor extends ClassVisitor {
                 return new AnnotationArrayProcessor(new SetAsAnnotationDefault(annotationTypeName, methodBuilder));
             }
 
+        }
+
+        private class InformationFlow {
+            private final Map<Integer, Set<RawHint>> stackTypeHints = new HashMap<>();
+            private final Map<Integer, Set<RawHint>> localVarTypeHints = new HashMap<>();
+            private final Set<RawHint> returnValueTypeHints = new HashSet<>();
+
+            private void putReturnValueHints(Set<RawHint> typeHints) {
+                returnValueTypeHints.addAll(typeHints);
+            }
+
+            private Set<RawHint> getReturnValueHints() {
+                return returnValueTypeHints;
+            }
+
+            private void putStackHint(int stackIndex, RawHint typeHint) {
+                if (logEverything) {
+                    LOG.info("putHint {} {}", stackIndex, typeHint);
+                }
+
+                Set<RawHint> hints = stackTypeHints.get(stackIndex);
+                if (hints == null) {
+                    hints = new HashSet<>();
+                    stackTypeHints.put(stackIndex, hints);
+                }
+
+                hints.add(typeHint);
+            }
+
+            private Set<RawHint> popStackHintsAt(int stackIndex) {
+                Set<RawHint> hints = stackTypeHints.remove(stackIndex);
+                if (hints == null) {
+                    hints = Collections.emptySet();
+                }
+                return hints;
+            }
+
+            private Set<RawHint> popStackHints(int argumentCount) {
+                Set<RawHint> hints = new HashSet<>();
+                for (int i = 1; i <= argumentCount; i++) {
+                    hints.addAll(popStackHintsAt(stack.size() - i));
+                }
+                return hints;
+            }
+
+            private void linkStackHints(int stackOrigin, int stackTarget) {
+                if (logEverything) {
+                    LOG.info("Linking stack index {} to {}", stackTarget, stackOrigin);
+                }
+
+                Set<RawHint> hints = stackTypeHints.get(stackOrigin);
+                if (hints == null) {
+                    hints = new HashSet<>();
+                    stackTypeHints.put(stackOrigin, hints);
+                }
+                stackTypeHints.put(stackTarget, hints);
+            }
+
+            private void storeLocalVar(int varIndex) {
+                int stackIndex = stack.size() - 1;
+                Set<RawHint> hints = stackTypeHints.remove(stackIndex);
+                if (hints != null) {
+                    localVarTypeHints.put(varIndex, hints);
+                } else {
+                    localVarTypeHints.remove(varIndex);
+                }
+            }
+
+            private void loadLocalVar(int varIndex) {
+                int stackIndex = stack.size() - 1;
+                Set<RawHint> hints = localVarTypeHints.get(varIndex);
+                if (hints != null) {
+                    stackTypeHints.put(stackIndex, hints);
+                } else {
+                    stackTypeHints.remove(stackIndex);
+                }
+            }
+
+            private Set<RawHint> getArgumentHints(int argumentCount) {
+                if (stack == null || argumentCount == 0) {
+                    return Collections.emptySet();
+                }
+
+                Set<RawHint> arguments = new HashSet<>();
+
+                // Add argument types based on references stored on the stack
+                for (int i = stack.size() - argumentCount; i < stack.size(); i++) {
+                    if (stack.get(i) instanceof String) {
+                        JavaType argument = JavaTypeImporter.createFromAsmObjectTypeName((String) stack.get(i));
+                        arguments.add(new RawHint(argument));
+                    }
+                }
+
+                // Add type hints (e.g. known array contents, string concatenation)
+                arguments.addAll(popStackHints(argumentCount));
+
+                return arguments;
+            }
         }
     }
 
@@ -436,18 +762,18 @@ class JavaClassProcessor extends ClassVisitor {
     }
 
     interface AccessHandler {
-        void handleFieldInstruction(int opcode, String owner, String name, String desc);
+        void handleFieldInstruction(int opcode, String owner, String name, String desc, Set<RawHint> arguments);
 
         void setContext(CodeUnit codeUnit);
 
         void setLineNumber(int lineNumber);
 
-        void handleMethodInstruction(String owner, String name, String desc);
+        void handleMethodInstruction(String owner, String name, String desc, Set<RawHint> arguments);
 
         @Internal
         class NoOp implements AccessHandler {
             @Override
-            public void handleFieldInstruction(int opcode, String owner, String name, String desc) {
+            public void handleFieldInstruction(int opcode, String owner, String name, String desc, Set<RawHint> arguments) {
             }
 
             @Override
@@ -459,7 +785,7 @@ class JavaClassProcessor extends ClassVisitor {
             }
 
             @Override
-            public void handleMethodInstruction(String owner, String name, String desc) {
+            public void handleMethodInstruction(String owner, String name, String desc, Set<RawHint> arguments) {
             }
         }
     }

@@ -16,12 +16,7 @@
 package com.tngtech.archunit.core.importer;
 
 import java.net.URI;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
@@ -31,33 +26,15 @@ import com.google.common.collect.ImmutableSet;
 import com.tngtech.archunit.Internal;
 import com.tngtech.archunit.base.HasDescription;
 import com.tngtech.archunit.base.Optional;
-import com.tngtech.archunit.core.domain.AccessTarget;
+import com.tngtech.archunit.core.domain.*;
 import com.tngtech.archunit.core.domain.AccessTarget.ConstructorCallTarget;
 import com.tngtech.archunit.core.domain.AccessTarget.FieldAccessTarget;
 import com.tngtech.archunit.core.domain.AccessTarget.MethodCallTarget;
-import com.tngtech.archunit.core.domain.DomainObjectCreationContext;
-import com.tngtech.archunit.core.domain.Formatters;
-import com.tngtech.archunit.core.domain.JavaAnnotation;
-import com.tngtech.archunit.core.domain.JavaClass;
-import com.tngtech.archunit.core.domain.JavaClassList;
-import com.tngtech.archunit.core.domain.JavaCodeUnit;
-import com.tngtech.archunit.core.domain.JavaConstructor;
-import com.tngtech.archunit.core.domain.JavaConstructorCall;
-import com.tngtech.archunit.core.domain.JavaEnumConstant;
-import com.tngtech.archunit.core.domain.JavaField;
-import com.tngtech.archunit.core.domain.JavaFieldAccess;
 import com.tngtech.archunit.core.domain.JavaFieldAccess.AccessType;
-import com.tngtech.archunit.core.domain.JavaMember;
-import com.tngtech.archunit.core.domain.JavaMethod;
-import com.tngtech.archunit.core.domain.JavaMethodCall;
-import com.tngtech.archunit.core.domain.JavaModifier;
-import com.tngtech.archunit.core.domain.JavaStaticInitializer;
-import com.tngtech.archunit.core.domain.JavaType;
-import com.tngtech.archunit.core.domain.Source;
-import com.tngtech.archunit.core.domain.ThrowsClause;
 import com.tngtech.archunit.core.importer.DomainBuilders.JavaAnnotationBuilder.ValueBuilder;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Suppliers.memoize;
 import static com.tngtech.archunit.core.domain.DomainObjectCreationContext.createJavaClassList;
 import static com.tngtech.archunit.core.domain.DomainObjectCreationContext.createSource;
 import static com.tngtech.archunit.core.domain.DomainObjectCreationContext.createThrowsClause;
@@ -70,9 +47,11 @@ public final class DomainBuilders {
 
     static <T extends HasDescription> Map<String, JavaAnnotation<T>> buildAnnotations(T owner, Set<JavaAnnotationBuilder> annotations, ClassesByTypeName importedClasses) {
         ImmutableMap.Builder<String, JavaAnnotation<T>> result = ImmutableMap.builder();
-        for (JavaAnnotationBuilder annotationBuilder : annotations) {
-            JavaAnnotation<T> javaAnnotation = annotationBuilder.build(owner, importedClasses);
-            result.put(javaAnnotation.getRawType().getName(), javaAnnotation);
+        if (annotations != null) {
+            for (JavaAnnotationBuilder annotationBuilder : annotations) {
+                JavaAnnotation<T> javaAnnotation = annotationBuilder.build(owner, importedClasses);
+                result.put(javaAnnotation.getRawType().getName(), javaAnnotation);
+            }
         }
         return result.build();
     }
@@ -257,6 +236,8 @@ public final class DomainBuilders {
     public static final class JavaMethodBuilder extends JavaCodeUnitBuilder<JavaMethod, JavaMethodBuilder> {
         private Optional<ValueBuilder> annotationDefaultValueBuilder = Optional.absent();
         private Supplier<Optional<Object>> annotationDefaultValue = Suppliers.ofInstance(Optional.absent());
+        private Set<RawHint> rawReturnValueHints;
+        private Supplier<Set<Hint>> returnValueHints;
 
         JavaMethodBuilder() {
         }
@@ -266,15 +247,44 @@ public final class DomainBuilders {
             return this;
         }
 
+        JavaMethodBuilder withReturnValueHints(Set<RawHint> returnValueHints) {
+            this.rawReturnValueHints = returnValueHints;
+            return this;
+        }
+
         public Supplier<Optional<Object>> getAnnotationDefaultValue() {
             return annotationDefaultValue;
         }
 
+        public Supplier<Set<Hint>> getReturnValueHints() {
+            return returnValueHints;
+        }
+
         @Override
-        JavaMethod construct(JavaMethodBuilder builder, final ClassesByTypeName importedClasses) {
+        JavaMethod construct(final JavaMethodBuilder builder, final ClassesByTypeName importedClasses) {
             if (annotationDefaultValueBuilder.isPresent()) {
                 annotationDefaultValue = Suppliers.memoize(new DefaultValueSupplier(getOwner(), annotationDefaultValueBuilder.get(), importedClasses));
             }
+
+            returnValueHints = memoize(new Supplier<Set<Hint>>() {
+                @Override
+                public Set<Hint> get() {
+                    if (rawReturnValueHints == null) {
+                        return Collections.emptySet();
+                    }
+
+                    Set<Hint> hints = new HashSet<>();
+                    for (RawHint rawHint : rawReturnValueHints) {
+                        JavaMember memberOrigin = null;
+                        if (rawHint.hasMember()) {
+                            memberOrigin = rawHint.resolveMemberIn(importedClasses.get(rawHint.getMemberOwner().getName()));
+                        }
+                        hints.add(new Hint(importedClasses.get(rawHint.getType().getName()), memberOrigin));
+                    }
+                    return hints;
+                }
+            });
+
             return DomainObjectCreationContext.createJavaMethod(builder);
         }
 
@@ -518,6 +528,7 @@ public final class DomainBuilders {
     public abstract static class JavaAccessBuilder<TARGET extends AccessTarget, SELF extends JavaAccessBuilder<TARGET, SELF>> {
         private JavaCodeUnit origin;
         private TARGET target;
+        private Set<Hint> argumentHints;
         private int lineNumber;
 
         private JavaAccessBuilder() {
@@ -533,6 +544,11 @@ public final class DomainBuilders {
             return self();
         }
 
+        SELF withArgumentHints(final Set<Hint> argumentHints) {
+            this.argumentHints = argumentHints;
+            return self();
+        }
+
         SELF withLineNumber(final int lineNumber) {
             this.lineNumber = lineNumber;
             return self();
@@ -544,6 +560,10 @@ public final class DomainBuilders {
 
         public TARGET getTarget() {
             return target;
+        }
+
+        public Set<Hint> getArgumentHints() {
+            return argumentHints;
         }
 
         public int getLineNumber() {

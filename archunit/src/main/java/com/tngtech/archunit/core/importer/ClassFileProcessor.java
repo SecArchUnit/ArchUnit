@@ -53,7 +53,7 @@ class ClassFileProcessor {
             try (InputStream s = location.openStream()) {
                 JavaClassProcessor javaClassProcessor =
                         new JavaClassProcessor(location.getUri(), classDetailsRecorder, accessHandler);
-                new ClassReader(s).accept(javaClassProcessor, 0);
+                new ClassReader(s).accept(javaClassProcessor, ClassReader.EXPAND_FRAMES);
                 importRecord.addAll(javaClassProcessor.createJavaClass().asSet());
             } catch (Exception e) {
                 LOG.warn(String.format("Couldn't import class from %s", location.getUri()), e);
@@ -137,31 +137,32 @@ class ClassFileProcessor {
         }
 
         @Override
-        public void handleFieldInstruction(int opcode, String owner, String name, String desc) {
+        public void handleFieldInstruction(int opcode, String owner, String name, String desc, Set<RawHint> arguments) {
             AccessType accessType = AccessType.forOpCode(opcode);
             LOG.trace("Found {} access to field {}.{}:{} in line {}", accessType, owner, name, desc, lineNumber);
             TargetInfo target = new RawAccessRecord.FieldTargetInfo(owner, name, desc);
-            importRecord.registerFieldAccess(filled(new RawAccessRecord.ForField.Builder(), target)
+            importRecord.registerFieldAccess(filled(new RawAccessRecord.ForField.Builder(), target, arguments)
                     .withAccessType(accessType)
                     .build());
         }
 
         @Override
-        public void handleMethodInstruction(String owner, String name, String desc) {
+        public void handleMethodInstruction(String owner, String name, String desc, Set<RawHint> arguments) {
             LOG.trace("Found call of method {}.{}:{} in line {}", owner, name, desc, lineNumber);
             if (CONSTRUCTOR_NAME.equals(name)) {
                 TargetInfo target = new ConstructorTargetInfo(owner, name, desc);
-                importRecord.registerConstructorCall(filled(new RawAccessRecord.Builder(), target).build());
+                importRecord.registerConstructorCall(filled(new RawAccessRecord.Builder(), target, arguments).build());
             } else {
                 TargetInfo target = new MethodTargetInfo(owner, name, desc);
-                importRecord.registerMethodCall(filled(new RawAccessRecord.Builder(), target).build());
+                importRecord.registerMethodCall(filled(new RawAccessRecord.Builder(), target, arguments).build());
             }
         }
 
-        private <BUILDER extends RawAccessRecord.BaseBuilder<BUILDER>> BUILDER filled(BUILDER builder, TargetInfo target) {
+        private <BUILDER extends RawAccessRecord.BaseBuilder<BUILDER>> BUILDER filled(BUILDER builder, TargetInfo target, Set<RawHint> arguments) {
             return builder
                     .withCaller(codeUnit)
                     .withTarget(target)
+                    .withArgumentHints(arguments)
                     .withLineNumber(lineNumber);
         }
     }
@@ -183,7 +184,7 @@ class ClassFileProcessor {
         public Optional<JavaClass> tryImport(URI uri) {
             try (InputStream inputStream = uri.toURL().openStream()) {
                 JavaClassProcessor classProcessor = new JavaClassProcessor(uri, declarationHandler);
-                new ClassReader(inputStream).accept(classProcessor, 0);
+                new ClassReader(inputStream).accept(classProcessor, ClassReader.EXPAND_FRAMES);
                 return classProcessor.createJavaClass();
             } catch (Exception e) {
                 LOG.warn(String.format("Error during import from %s, falling back to simple import", uri), e);

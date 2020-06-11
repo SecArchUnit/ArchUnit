@@ -4,6 +4,7 @@ ext.moduleName = 'com.tngtech.archunit'
 
 dependencies {
     compile dependency.asm
+    compile dependency.'asm-commons'
     compile dependency.guava
     compile dependency.slf4j
 
